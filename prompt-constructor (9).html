@@ -1,0 +1,1141 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Konstruktor promptů</title>
+<style>
+  :root{
+    --paper:#F6F5F2; --surface:#FFFFFF; --line:#E7E4DD; --line-strong:#D6D1C6;
+    --ink:#17171A; --muted:#6A675E; --faint:#A8A498;
+    --accent:#4B3FD6; --accent-tint:#ECEAFB; --accent-ink:#362CB0; --ok:#1E8A5F;
+    --img:#0C877A; --img-tint:#D9F1EE; --vid:#C2410C; --vid-tint:#FBE7DD;
+    --radius:6px;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --serif:"Iowan Old Style",Georgia,"Times New Roman",serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--paper);color:var(--ink);font-family:var(--sans);
+    font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  body[data-mode="image"]{--accent:var(--img);--accent-tint:var(--img-tint);--accent-ink:#0A6E63}
+  body[data-mode="video"]{--accent:var(--vid);--accent-tint:var(--vid-tint);--accent-ink:#9A3412}
+  body[data-mode="code"]{--accent:#D81B54;--accent-tint:#FCE6EC;--accent-ink:#B01345}
+
+  .app{max-width:1200px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;padding:0 28px}
+
+  /* masthead */
+  header{padding:34px 0 16px;display:flex;align-items:flex-end;justify-content:space-between;
+    gap:20px;flex-wrap:wrap;border-bottom:2px solid var(--ink)}
+  .brand{display:flex;flex-direction:column;gap:6px;max-width:60ch}
+  .brand .mark{font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--accent);font-weight:700}
+  .brand h1{font-size:clamp(25px,3.4vw,32px);font-weight:800;letter-spacing:-.022em;line-height:1.03;margin:0}
+  .brand p{margin:2px 0 0;color:var(--muted);font-size:13.5px;line-height:1.5;max-width:56ch}
+  .head-ctrl{display:flex;align-items:center;gap:10px;padding-bottom:4px}
+
+  .segmented{display:inline-flex;background:var(--surface);border:1px solid var(--line-strong);
+    border-radius:6px;padding:2px;gap:2px}
+  .segmented button{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;
+    border:0;background:transparent;color:var(--muted);padding:5px 10px;border-radius:4px;
+    cursor:pointer;transition:all .12s ease;font-weight:600}
+  .segmented button:hover{color:var(--ink)}
+  .segmented button[aria-pressed="true"]{background:var(--ink);color:#fff}
+  .segmented.lang button{min-width:34px}
+
+  /* category nav */
+  .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line-strong);margin:22px 0 0}
+  .tab{font-family:var(--sans);font-size:12.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+    border:0;background:none;color:var(--muted);padding:13px 18px 15px;cursor:pointer;position:relative;
+    border-bottom:3px solid transparent;margin-bottom:-1px;transition:color .12s ease}
+  .tab:hover{color:var(--ink)}
+  .tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+  .tab .dot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:8px;
+    background:var(--line-strong);vertical-align:middle}
+  .tab[data-mode="text"][aria-selected="true"] .dot{background:#4B3FD6}
+  .tab[data-mode="image"][aria-selected="true"] .dot{background:#0C877A}
+  .tab[data-mode="video"][aria-selected="true"] .dot{background:#C2410C}
+  .tab[data-mode="code"][aria-selected="true"] .dot{background:#D81B54}
+
+  .grid{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:34px;padding:28px 0 48px;align-items:start}
+  .panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;
+    margin-bottom:16px;min-height:30px;flex-wrap:wrap}
+  .panel-head .title{font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;
+    color:var(--ink);font-weight:700;display:inline-flex;align-items:center}
+  .panel-head .title::before{content:"";width:7px;height:7px;background:var(--accent);
+    border-radius:1px;margin-right:9px;display:inline-block}
+
+  .block{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--line-strong);
+    border-radius:var(--radius);padding:14px 17px 16px;margin-bottom:13px;
+    transition:border-color .15s ease,box-shadow .15s ease}
+  .block.filled{border-left-color:var(--accent)}
+  .block:focus-within{border-color:var(--line-strong);border-left-color:var(--accent);
+    box-shadow:0 2px 14px rgba(20,20,26,.05)}
+  .block.special{background:#FBFAF7;border-style:dashed}
+  .block.special.filled{border-left-style:solid}
+  .block .lbl{display:flex;align-items:baseline;gap:9px;margin-bottom:7px}
+  .block .num{font-family:var(--serif);font-size:16px;font-weight:700;color:var(--faint);
+    line-height:1;font-variant-numeric:tabular-nums}
+  .block.filled .num{color:var(--accent)}
+  .block label{font-weight:700;font-size:14.5px;letter-spacing:-.006em;cursor:pointer}
+  .block .hint{color:var(--muted);font-size:12.5px;margin:0 0 9px}
+  .block textarea{width:100%;border:1px solid var(--line);border-radius:5px;background:#FCFCFB;
+    color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;padding:9px 11px;
+    resize:vertical;min-height:40px;transition:border-color .12s ease,background .12s ease,box-shadow .12s ease}
+  .block textarea:focus{outline:none;border-color:var(--accent);background:#fff;box-shadow:0 0 0 3px var(--accent-tint)}
+  .block textarea::placeholder{color:var(--faint)}
+  .block textarea.sm{min-height:40px}
+  .block textarea.md{min-height:60px}
+  .block textarea.codearea{font-family:var(--mono);font-size:12.5px;line-height:1.5;min-height:130px;tab-size:2;white-space:pre}
+
+  .chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}
+  .chips button{font-family:var(--sans);font-size:11.5px;color:var(--muted);background:var(--paper);
+    border:1px solid var(--line);border-radius:20px;padding:3px 10px;cursor:pointer;transition:all .12s ease}
+  .chips button:hover{border-color:var(--accent);color:var(--accent-ink);background:var(--accent-tint)}
+
+  .lbl .clr{margin-left:auto;align-self:center;border:0;background:none;color:var(--faint);
+    font-size:17px;line-height:1;cursor:pointer;padding:0 2px;display:none}
+  .lbl .clr:hover{color:var(--accent-ink)}
+  .block.filled .lbl .clr{display:inline-flex}
+
+  .tip{position:fixed;z-index:60;max-width:236px;background:var(--ink);color:#F4F3EF;border-radius:8px;
+    padding:11px 12px;box-shadow:0 10px 30px rgba(15,15,20,.30);font-family:var(--sans);font-size:12.5px;
+    line-height:1.45;opacity:0;pointer-events:none;transform:translateY(3px);transition:opacity .12s ease,transform .12s ease}
+  .tip.show{opacity:1;transform:translateY(0)}
+  .tip .tip-vis{width:100%;height:66px;border-radius:5px;background:#26262B;margin-bottom:8px;
+    display:flex;align-items:center;justify-content:center;overflow:hidden}
+  .tip .tip-vis svg{width:80px;height:56px;--accent:#9AA6FF}
+  .tip .tip-term{font-family:var(--mono);font-size:11px;color:#ABA79C;letter-spacing:.03em;margin-bottom:3px}
+  .tip .tip-def{color:#F4F3EF}
+
+  .result-col{position:sticky;top:16px}
+  .fmt-hint{font-size:12px;color:var(--muted);margin:0 0 10px;min-height:16px;line-height:1.4;font-style:italic}
+  .aspect-bar{display:flex;align-items:center;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+  .aspect-bar .ar-lbl{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--faint);margin-right:2px}
+  .aspect-bar button{font-family:var(--mono);font-size:11.5px;color:var(--muted);background:var(--surface);
+    border:1px solid var(--line);border-radius:5px;padding:4px 9px;cursor:pointer;transition:all .12s ease}
+  .aspect-bar button:hover{border-color:var(--faint);color:var(--ink)}
+  .aspect-bar button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent-ink);
+    background:var(--accent-tint);font-weight:600}
+
+  .output{background:var(--surface);border:1px solid var(--line-strong);border-top:2px solid var(--accent);
+    border-radius:var(--radius);overflow:hidden}
+  .output pre{margin:0;padding:20px;font-family:var(--mono);font-size:13px;line-height:1.62;
+    white-space:pre-wrap;word-break:break-word;color:var(--ink);
+    max-height:calc(100vh - 300px);min-height:260px;overflow:auto;tab-size:2}
+  .output pre.empty{color:var(--faint)}
+  .output-foot{border-top:1px solid var(--line);padding:11px 14px;display:flex;
+    align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:#FCFCFB}
+  .count{font-family:var(--mono);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .acts{display:flex;gap:8px;flex-wrap:wrap}
+
+  button.act{font-family:var(--sans);font-size:13px;font-weight:600;border:1px solid var(--line-strong);
+    background:var(--surface);color:var(--ink);padding:8px 14px;border-radius:6px;cursor:pointer;
+    transition:all .12s ease;display:inline-flex;align-items:center;gap:7px}
+  button.act:hover{border-color:var(--faint);background:#FBFAF7}
+  button.act.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  button.act.primary:hover{filter:brightness(.94)}
+  button.act.done{background:var(--ok);border-color:var(--ok);color:#fff}
+  button.act:disabled{opacity:.45;cursor:not-allowed}
+  .badge{font-family:var(--mono);font-size:11px;font-weight:700;background:var(--accent-tint);
+    color:var(--accent-ink);border-radius:20px;padding:1px 7px;min-width:20px;text-align:center;font-variant-numeric:tabular-nums}
+
+  .link{font-family:var(--sans);font-size:12.5px;color:var(--muted);background:none;border:0;cursor:pointer;padding:2px 0}
+  .link:hover{color:var(--accent-ink);text-decoration:underline}
+  .fill-meter{font-family:var(--mono);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .fill-meter b{color:var(--accent);font-weight:700}
+  .ph-right{display:flex;align-items:center;gap:12px}
+  .clear-btn{font-family:var(--sans);font-size:12px;font-weight:600;border:1px solid var(--line-strong);
+    background:var(--surface);color:var(--muted);padding:6px 12px;border-radius:6px;cursor:pointer;
+    display:inline-flex;align-items:center;gap:5px;transition:all .12s ease}
+  .clear-btn:hover{border-color:#E3A9A0;color:#B4351F;background:#fff}
+  .clear-btn:disabled{opacity:.4;cursor:not-allowed}
+  .clear-btn:disabled:hover{border-color:var(--line-strong);color:var(--muted);background:var(--surface)}
+  .clear-btn.arm{border-color:#B4351F;color:#B4351F;background:#FBEAE6;font-weight:700}
+  .link.arm{color:#B4351F;font-weight:700;text-decoration:underline}
+
+  footer{border-top:1px solid var(--line);margin-top:auto;padding:16px 0 22px;color:var(--faint);
+    font-size:12px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+
+  .overlay{position:fixed;inset:0;background:rgba(20,20,26,.38);opacity:0;pointer-events:none;
+    transition:opacity .2s ease;z-index:40}
+  .drawer{position:fixed;top:0;right:0;height:100%;width:min(430px,92vw);background:var(--surface);
+    border-left:1px solid var(--line-strong);box-shadow:-16px 0 46px rgba(20,20,26,.16);
+    transform:translateX(100%);transition:transform .24s cubic-bezier(.4,0,.2,1);z-index:41;display:flex;flex-direction:column}
+  body.hist-open .overlay{opacity:1;pointer-events:auto}
+  body.hist-open .drawer{transform:translateX(0)}
+  .drawer-head{display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:20px 18px 15px;border-bottom:2px solid var(--ink)}
+  .drawer-head .title{font-size:16px;font-weight:800;letter-spacing:-.01em}
+  .icon-btn{border:1px solid var(--line-strong);background:var(--surface);color:var(--muted);
+    width:30px;height:30px;border-radius:6px;cursor:pointer;font-size:15px;line-height:1}
+  .icon-btn:hover{color:var(--ink);border-color:var(--faint)}
+  .drawer-body{flex:1;overflow:auto;padding:14px 16px}
+  .hist-empty{color:var(--faint);font-size:13px;text-align:center;padding:40px 10px;line-height:1.6}
+  .entry{border:1px solid var(--line);border-radius:6px;padding:12px 13px;margin-bottom:10px;background:#FCFCFB}
+  .entry-top{display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap}
+  .entry .mode-badge{font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;
+    border-radius:3px;padding:2px 6px;font-weight:700}
+  .mb-text{color:#362CB0;background:#ECEAFB}
+  .mb-image{color:#0A6E63;background:#D9F1EE}
+  .mb-video{color:#9A3412;background:#FBE7DD}
+  .mb-code{color:#B01345;background:#FCE6EC}
+  .entry .fmt-badge{font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;
+    color:var(--muted);background:var(--paper);border:1px solid var(--line);border-radius:3px;padding:2px 6px}
+  .entry .ts{font-family:var(--mono);font-size:10.5px;color:var(--faint);margin-left:auto}
+  .entry .etitle{font-weight:700;font-size:13.5px;margin:0 0 3px;word-break:break-word;letter-spacing:-.006em}
+  .entry .eprev{color:var(--muted);font-size:12px;margin:0 0 9px;line-height:1.45;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .entry-acts{display:flex;gap:6px}
+  .entry-acts button{font-family:var(--sans);font-size:12px;border:1px solid var(--line-strong);
+    background:var(--surface);color:var(--ink);border-radius:5px;padding:4px 9px;cursor:pointer;transition:all .12s ease}
+  .entry-acts button:hover{border-color:var(--faint)}
+  .entry-acts button.danger:hover{color:#B4351F;border-color:#E3A9A0}
+  .drawer-foot{border-top:1px solid var(--line);padding:12px 16px}
+
+  @media (max-width:880px){
+    .app{padding:0 18px}
+    .grid{grid-template-columns:1fr;gap:10px}
+    .result-col{position:static}
+    .output pre{max-height:none;min-height:200px}
+    header{align-items:flex-start}
+  }
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body data-mode="text">
+<div class="app">
+  <header>
+    <div class="brand">
+      <span class="mark" id="ui-mark"></span>
+      <h1 id="ui-title"></h1>
+      <p id="ui-sub"></p>
+    </div>
+    <div class="head-ctrl">
+      <div class="segmented lang" role="group" aria-label="Jazyk / Language">
+        <button data-lang="cs" aria-pressed="true">CS</button>
+        <button data-lang="ru" aria-pressed="false">RU</button>
+        <button data-lang="en" aria-pressed="false">EN</button>
+      </div>
+      <button class="act" id="histBtn"><span id="ui-hist"></span> <span class="badge" id="histCount">0</span></button>
+    </div>
+  </header>
+
+  <div class="tabs" role="tablist" id="tabs">
+    <button class="tab" role="tab" data-mode="text"  aria-selected="true"><span class="dot"></span><span data-tab="text"></span></button>
+    <button class="tab" role="tab" data-mode="image" aria-selected="false"><span class="dot"></span><span data-tab="image"></span></button>
+    <button class="tab" role="tab" data-mode="video" aria-selected="false"><span class="dot"></span><span data-tab="video"></span></button>
+    <button class="tab" role="tab" data-mode="code"  aria-selected="false"><span class="dot"></span><span data-tab="code"></span></button>
+  </div>
+
+  <div class="grid">
+    <section aria-label="Components">
+      <div class="panel-head">
+        <span class="title" id="ui-components"></span>
+        <div class="ph-right">
+          <span class="fill-meter"><b id="fillN">0</b> / <span id="fillT">0</span> <span id="fillWord"></span></span>
+          <button class="clear-btn" id="clearBtn"></button>
+        </div>
+      </div>
+      <div id="form"></div>
+    </section>
+
+    <section class="result-col" aria-label="Composed prompt">
+      <div class="panel-head">
+        <span class="title" id="ui-prompt"></span>
+        <div class="segmented" id="fmtControl" role="group" aria-label="Output format"></div>
+      </div>
+      <p class="fmt-hint" id="fmtHint"></p>
+      <div class="aspect-bar" id="aspectBar" style="display:none"></div>
+      <div class="output">
+        <pre id="out" class="empty" aria-live="polite"></pre>
+        <div class="output-foot">
+          <span class="count" id="count"></span>
+          <div class="acts">
+            <button class="act" id="saveBtn"></button>
+            <button class="act" id="dlBtn"></button>
+            <button class="act primary" id="copyBtn"></button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <footer>
+    <span id="ui-footL"></span>
+    <span id="fmtNote"></span>
+  </footer>
+</div>
+
+<div class="overlay" id="overlay"></div>
+<aside class="drawer" id="drawer" aria-label="History">
+  <div class="drawer-head">
+    <span class="title" id="ui-histTitle"></span>
+    <button class="icon-btn" id="histClose" aria-label="Close">✕</button>
+  </div>
+  <div class="drawer-body" id="histList"></div>
+  <div class="drawer-foot"><button class="link" id="histClear"></button></div>
+</aside>
+
+<div class="tip" id="tip" role="tooltip"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* chips insert English terms (image/video models respond best to them) */
+  var V = {
+    composition:["close-up","extreme close-up","medium shot","wide shot","full body","portrait",
+      "overhead / top-down","low angle","high angle","dutch angle","rule of thirds","centered","symmetrical"],
+    lighting:["golden hour","blue hour","soft diffused light","hard light","backlight / rim light",
+      "volumetric light","neon glow","studio softbox","cinematic lighting","chiaroscuro","overcast","low-key","high-key"],
+    camera:["35mm","50mm","85mm","macro","wide-angle","telephoto","shallow depth of field","f/1.4",
+      "tilt-shift","shot on film","long exposure","bokeh"],
+    style:["photorealistic","cinematic","oil painting","watercolor","3D render","Octane render","anime",
+      "cyberpunk","art deco","minimalist","concept art","isometric","line art","film grain"],
+    palette:["warm tones","cool tones","muted pastels","high contrast","monochrome","earth tones",
+      "neon palette","teal and orange","desaturated"],
+    environment:["studio backdrop","dense forest","neon-lit city street","misty mountains",
+      "cozy interior","desert dunes","underwater","futuristic lab"],
+    cameraMove:["static shot","slow push-in","pull-out","pan left","pan right","tilt up","tracking shot",
+      "dolly zoom","crane shot","handheld","orbit / arc","drone flyover","FPV"],
+    dynamics:["slow motion","time-lapse","real-time","fast-paced","smooth","hyperlapse","seamless loop",
+      "2 seconds","5 seconds","8 seconds"]
+  };
+
+  var CLR_LABEL={cs:"Vymazat blok",ru:"Очистить блок",en:"Clear block"};
+
+  /* ---------- visual glossary (defs localized; visuals drawn, no sourced photos) ---------- */
+  var FR='<rect x="3" y="4" width="66" height="42" rx="5" fill="none" stroke="#C2C6CD" stroke-width="1.5"/>';
+  var DEF='<defs><marker id="ah" markerWidth="7" markerHeight="7" refX="5.5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="var(--accent)"/></marker></defs>';
+  function A(x1,y1,x2,y2){ return '<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" marker-end="url(#ah)"/>'; }
+  function svg(inner){ return '<svg viewBox="0 0 72 50" xmlns="http://www.w3.org/2000/svg">'+DEF+FR+inner+'</svg>'; }
+  var DGP={
+    closeup:'<circle cx="36" cy="25" r="15" fill="var(--accent)" opacity="0.85"/>',
+    xcloseup:'<circle cx="36" cy="27" r="23" fill="var(--accent)" opacity="0.85"/>',
+    medium:'<circle cx="36" cy="20" r="8" fill="var(--accent)"/><path d="M23,44 a13,13 0 0 1 26,0 z" fill="var(--accent)" opacity="0.85"/>',
+    wide:'<circle cx="36" cy="28" r="3.5" fill="var(--accent)"/><rect x="34" y="31" width="4" height="9" rx="1.5" fill="var(--accent)"/>',
+    fullbody:'<circle cx="36" cy="13" r="4" fill="var(--accent)"/><rect x="32.5" y="17" width="7" height="26" rx="3" fill="var(--accent)" opacity="0.9"/>',
+    portrait:'<rect x="26" y="8" width="20" height="34" rx="3" fill="none" stroke="var(--accent)" stroke-width="1.5"/><circle cx="36" cy="20" r="6" fill="var(--accent)"/>',
+    overhead:A(36,7,36,17)+'<circle cx="36" cy="30" r="9" fill="var(--accent)" opacity="0.85"/>',
+    low:'<circle cx="36" cy="17" r="5" fill="var(--accent)"/><rect x="32" y="21" width="8" height="15" rx="2" fill="var(--accent)" opacity="0.9"/>'+A(36,44,36,30),
+    high:'<circle cx="36" cy="30" r="5" fill="var(--accent)"/><rect x="32" y="34" width="8" height="9" rx="2" fill="var(--accent)" opacity="0.9"/>'+A(36,7,36,22),
+    dutch:'<g transform="rotate(-16 36 25)"><line x1="10" y1="25" x2="62" y2="25" stroke="#C2C6CD" stroke-width="1.5"/><circle cx="36" cy="18" r="6" fill="var(--accent)"/></g>',
+    thirds:'<line x1="25" y1="4" x2="25" y2="46" stroke="#D7DAE0" stroke-width="1"/><line x1="47" y1="4" x2="47" y2="46" stroke="#D7DAE0" stroke-width="1"/><line x1="3" y1="18" x2="69" y2="18" stroke="#D7DAE0" stroke-width="1"/><line x1="3" y1="32" x2="69" y2="32" stroke="#D7DAE0" stroke-width="1"/><circle cx="47" cy="18" r="4.5" fill="var(--accent)"/>',
+    centered:'<line x1="36" y1="8" x2="36" y2="42" stroke="#D7DAE0" stroke-width="1"/><line x1="14" y1="25" x2="58" y2="25" stroke="#D7DAE0" stroke-width="1"/><circle cx="36" cy="25" r="6" fill="var(--accent)"/>',
+    symmetrical:'<line x1="36" y1="6" x2="36" y2="44" stroke="#C2C6CD" stroke-width="1" stroke-dasharray="3 3"/><circle cx="24" cy="25" r="6" fill="var(--accent)" opacity="0.9"/><circle cx="48" cy="25" r="6" fill="var(--accent)" opacity="0.9"/>',
+    stat:'<circle cx="36" cy="25" r="8" fill="none" stroke="var(--accent)" stroke-width="2"/><circle cx="36" cy="25" r="2.5" fill="var(--accent)"/>',
+    push:A(14,25,29,25)+A(58,25,43,25)+'<rect x="31" y="19" width="10" height="12" rx="2" fill="var(--accent)" opacity="0.85"/>',
+    pull:A(29,25,14,25)+A(43,25,58,25)+'<rect x="31" y="19" width="10" height="12" rx="2" fill="var(--accent)" opacity="0.85"/>',
+    panL:A(54,25,18,25),
+    panR:A(18,25,54,25),
+    tiltUp:A(36,42,36,12),
+    track:'<circle cx="36" cy="19" r="6" fill="var(--accent)"/>'+A(16,38,56,38),
+    dollyzoom:A(16,17,30,17)+A(56,17,42,17)+A(30,33,16,33)+A(42,33,56,33),
+    crane:A(36,26,36,10)+A(36,26,36,42),
+    handheld:'<path d="M14,25 q7,-8 13,0 t13,0 t13,0" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" marker-end="url(#ah)"/>',
+    orbit:'<ellipse cx="36" cy="27" rx="22" ry="11" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="3 3"/><circle cx="36" cy="27" r="5" fill="var(--accent)"/><path d="M55,22 l4,4 l-5,2" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+    drone:A(14,10,40,30)+'<circle cx="44" cy="34" r="4" fill="var(--accent)" opacity="0.85"/>',
+    fpv:A(16,25,52,25)+'<line x1="12" y1="19" x2="22" y2="19" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/><line x1="12" y1="31" x2="22" y2="31" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>',
+    bokeh:'<circle cx="20" cy="16" r="6" fill="var(--accent)" opacity="0.18"/><circle cx="52" cy="18" r="8" fill="var(--accent)" opacity="0.14"/><circle cx="50" cy="36" r="5" fill="var(--accent)" opacity="0.2"/><circle cx="36" cy="27" r="10" fill="var(--accent)"/>',
+    widelens:'<path d="M36,44 L8,10 M36,44 L64,10" stroke="var(--accent)" stroke-width="1.5"/><path d="M12,14 A34,34 0 0 1 60,14" fill="none" stroke="var(--accent)" stroke-width="1.5" opacity="0.5"/><circle cx="36" cy="44" r="2.5" fill="var(--accent)"/>',
+    tele:'<path d="M36,44 L28,10 M36,44 L44,10" stroke="var(--accent)" stroke-width="1.5"/><circle cx="36" cy="44" r="2.5" fill="var(--accent)"/>',
+    macro:'<circle cx="31" cy="22" r="11" fill="none" stroke="var(--accent)" stroke-width="2"/><line x1="39" y1="30" x2="48" y2="39" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round"/><circle cx="31" cy="22" r="3" fill="var(--accent)"/>',
+    longexp:'<line x1="12" y1="18" x2="46" y2="18" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" opacity="0.35"/><line x1="18" y1="25" x2="58" y2="25" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" opacity="0.6"/><line x1="14" y1="32" x2="50" y2="32" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" opacity="0.35"/>',
+    tiltshift:'<rect x="3" y="4" width="66" height="12" fill="var(--accent)" opacity="0.12"/><rect x="3" y="20" width="66" height="10" fill="var(--accent)" opacity="0.9"/><rect x="3" y="34" width="66" height="12" fill="var(--accent)" opacity="0.12"/>'
+  };
+  function DG(k){ return DGP[k]?svg(DGP[k]):""; }
+
+  function G(cs,ru,en,vis){ return {def:{cs:cs,ru:ru,en:en},vis:vis||null}; }
+  var SW=function(g){ return "sw:"+g; };
+  var GLOSS={
+    /* composition */
+    "close-up":G("Záběr vyplněný obličejem či detailem.","Кадр заполнен лицом или деталью.","Frame filled by the subject's face or detail.","dg:closeup"),
+    "extreme close-up":G("Velmi těsně — jeden detail, oříznutý.","Очень крупно — одна деталь, с обрезкой.","Very tight — a single feature, cropped in.","dg:xcloseup"),
+    "medium shot":G("Objekt zhruba od pasu nahoru.","Объект примерно по пояс.","Subject from roughly the waist up.","dg:medium"),
+    "wide shot":G("Objekt malý ve velké scéně.","Объект мал на фоне большой сцены.","Subject small within a large scene.","dg:wide"),
+    "full body":G("Celá postava od hlavy k patě.","Вся фигура целиком.","The whole figure head to toe.","dg:fullbody"),
+    "portrait":G("Svislý záběr zaměřený na osobu.","Вертикальный кадр, акцент на человеке.","Vertical framing focused on a person.","dg:portrait"),
+    "overhead / top-down":G("Kamera míří přímo shora dolů.","Камера смотрит прямо сверху вниз.","Camera looks straight down from above.","dg:overhead"),
+    "low angle":G("Kamera zdola nahoru — dodá subjektu sílu.","Камера снизу вверх — придаёт мощь.","Camera below, looking up — makes the subject powerful.","dg:low"),
+    "high angle":G("Kamera shora dolů — objekt působí menší.","Камера сверху вниз — объект кажется меньше.","Camera above, looking down — subject seems smaller.","dg:high"),
+    "dutch angle":G("Nakloněný horizont — napětí, neklid.","Наклонённый горизонт — напряжение.","Tilted horizon — tension, unease.","dg:dutch"),
+    "rule of thirds":G("Objekt na linii mřížky 3×3, ne na středu.","Объект на линии сетки 3×3, не по центру.","Subject on a 3×3 grid line, not centered.","dg:thirds"),
+    "centered":G("Objekt přesně na středu.","Объект строго по центру.","Subject placed dead center.","dg:centered"),
+    "symmetrical":G("Zrcadlově vyvážená kompozice.","Зеркально уравновешенная композиция.","Balanced, mirror-like composition.","dg:symmetrical"),
+    /* lighting */
+    "golden hour":G("Teplé měkké světlo za úsvitu/soumraku.","Тёплый мягкий свет на рассвете/закате.","Warm, soft light after sunrise / before sunset.",SW("linear-gradient(135deg,#FFCF8B,#E8843C)")),
+    "blue hour":G("Chladný modrý soumrak.","Холодные синие сумерки.","Cool blue twilight before sunrise / after sunset.",SW("linear-gradient(135deg,#2C3E6B,#6A7FB5)")),
+    "soft diffused light":G("Měkké rozptýlené světlo bez ostrých stínů.","Мягкий рассеянный свет без резких теней.","Gentle, shadowless, even light.",SW("linear-gradient(135deg,#F3EFE9,#D9D3CA)")),
+    "hard light":G("Tvrdé světlo, ostré výrazné stíny.","Жёсткий свет, резкие чёткие тени.","Direct light, sharp defined shadows.",SW("linear-gradient(100deg,#EDE9E2 50%,#26262A 50%)")),
+    "backlight / rim light":G("Světlo zezadu, zářící obrys.","Свет сзади, светящийся контур.","Light from behind, glowing outline.",SW("radial-gradient(circle at 50% 62%,#0A0A0C 42%,#F4D58D)")),
+    "volumetric light":G("Viditelné paprsky světla ve vzduchu.","Видимые лучи света в воздухе.","Visible beams / rays through the air.",SW("linear-gradient(115deg,#1A2233,#F4D58D 55%,#1A2233)")),
+    "neon glow":G("Sytá barevná záře, neon.","Насыщенное цветное свечение, неон.","Saturated colored glow, night-city feel.",SW("linear-gradient(135deg,#12071F,#FF2ED1 60%,#22E0FF)")),
+    "studio softbox":G("Čisté řízené studiové světlo.","Чистый управляемый студийный свет.","Clean, controlled studio lighting.",SW("linear-gradient(135deg,#F3EFE9,#CBC7C0)")),
+    "cinematic lighting":G("Atmosférické kontrastní filmové světlo.","Атмосферный контрастный «киношный» свет.","Moody, contrasty, film-like light.",SW("linear-gradient(135deg,#12222E,#E8843C)")),
+    "chiaroscuro":G("Silný kontrast světla a tmy, drama.","Сильный контраст света и тени, драма.","Strong dark/light contrast, dramatic.",SW("linear-gradient(100deg,#0A0A0C 55%,#EDE6D2)")),
+    "overcast":G("Ploché rovné světlo zataženého dne.","Плоский ровный свет пасмурного дня.","Flat, even, cloudy-day light.",SW("linear-gradient(135deg,#C9CDD2,#AEB4BB)")),
+    "low-key":G("Převážně tmavý záběr, málo světel.","Преимущественно тёмный кадр.","Mostly dark, few highlights.",SW("linear-gradient(135deg,#0A0A0C,#3A3A42)")),
+    "high-key":G("Převážně světlý záběr, minimum stínů.","Преимущественно светлый кадр.","Mostly bright, minimal shadows.",SW("linear-gradient(135deg,#FFFFFF,#E5E8EE)")),
+    /* camera */
+    "35mm":G("Mírně širokoúhlý objektiv; přirozeně.","Умеренно широкий объектив; естественно.","Wide-ish lens; natural, roomy view."),
+    "50mm":G("„Normální“ objektiv, jako lidské oko.","«Нормальный» объектив, как глаз.","‘Normal’ lens; close to the human eye."),
+    "85mm":G("Portrétní teleobjektiv, lichotivý.","Портретный телеобъектив.","Short telephoto; flattering portraits."),
+    "macro":G("Extrémní detail drobných věcí.","Сверхкрупная съёмка мелких деталей.","Extreme close focus on tiny detail.","dg:macro"),
+    "wide-angle":G("Široký záběr; zvýrazněná perspektiva.","Широкий охват; усиленная перспектива.","Broad field of view; exaggerated depth.","dg:widelens"),
+    "telephoto":G("Úzký záběr; stlačuje prostor.","Узкий охват; сжимает пространство.","Narrow view; compresses distance.","dg:tele"),
+    "shallow depth of field":G("Ostrý objekt, rozmazané pozadí.","Резкий объект, размытый фон.","Sharp subject, blurred background.","dg:bokeh"),
+    "f/1.4":G("Světelná clona — silné rozmazání pozadí.","Открытая диафрагма — сильное размытие.","Wide aperture — strong background blur.","dg:bokeh"),
+    "tilt-shift":G("Výběrové ostření; efekt miniatury.","Выборочный фокус; эффект миниатюры.","Selective focus; miniature look.","dg:tiltshift"),
+    "shot on film":G("Filmový vzhled — zrno, měkká barva.","Плёночный вид — зерно, мягкий цвет.","Analog film look — grain, soft color."),
+    "long exposure":G("Pohyb rozmazaný do stop a šmouh.","Движение размазано в шлейфы.","Motion blurred into streaks / trails.","dg:longexp"),
+    "bokeh":G("Estetické rozostření světel v pozadí.","Красивое размытие точек света.","Aesthetic out-of-focus light blobs.","dg:bokeh"),
+    /* style */
+    "photorealistic":G("Vypadá jako skutečná fotografie.","Выглядит как настоящее фото.","Looks like a real photograph."),
+    "cinematic":G("Filmový záběr, barvy a nálada.","Киношные кадр, цвет, настроение.","Movie-like framing, color, mood."),
+    "oil painting":G("Olejové tahy štětcem, malířsky.","Мазки масла, живописно.","Textured brushstrokes, painterly."),
+    "watercolor":G("Měkké průsvitné akvarelové plochy.","Мягкие прозрачные акварельные заливки.","Soft, translucent washes of color."),
+    "3D render":G("Počítačový 3D vzhled.","Трёхмерный компьютерный рендер.","Computer-generated 3D look."),
+    "Octane render":G("Lesklý fyzikálně nasvícený 3D render.","Глянцевый фотореалистичный 3D-рендер.","Glossy, physically-lit 3D render."),
+    "anime":G("Styl japonské animace.","Стиль японской анимации.","Japanese-animation drawing style."),
+    "cyberpunk":G("Neon, techno, ponuré město budoucnosti.","Неон, техно, мрачное будущее.","Neon, tech, gritty future city."),
+    "art deco":G("Geometrický elegantní styl 20.–30. let.","Геометричный элегантный стиль 20–30-х.","Geometric, elegant 1920s–30s style."),
+    "minimalist":G("Málo prvků, hodně prázdna.","Мало элементов, много пустоты.","Few elements, lots of empty space."),
+    "concept art":G("Ilustrace pro filmy a hry.","Иллюстрация для фильмов и игр.","Illustration for film / game design."),
+    "isometric":G("3D bez perspektivního zkreslení.","3D без перспективных искажений.","3D look with no perspective distortion."),
+    "line art":G("Čisté obrysy bez stínování.","Чистый контур без заливки.","Clean outlines, no shading."),
+    "film grain":G("Jemné filmové zrno, analogová textura.","Мелкое плёночное зерно.","Subtle noisy analog texture."),
+    /* palette */
+    "warm tones":G("Červené, oranžové, žluté — útulno.","Красные, оранжевые, жёлтые — уют.","Reds, oranges, yellows — cozy feel.",SW("linear-gradient(135deg,#F4B860,#D9663B)")),
+    "cool tones":G("Modré, zelené — klidně, odtažitě.","Синие, зелёные — спокойно, отстранённо.","Blues, greens — calm, distant.",SW("linear-gradient(135deg,#5BA8D9,#3A5B9E)")),
+    "muted pastels":G("Měkké tlumené pastelové barvy.","Мягкие приглушённые пастельные цвета.","Soft, low-saturation gentle colors.",SW("linear-gradient(135deg,#E8C7D0,#CBD9C8,#C9C2DE)")),
+    "high contrast":G("Silný rozdíl mezi tmou a světlem.","Сильная разница света и тени.","Strong difference between dark and light.",SW("linear-gradient(135deg,#111 50%,#fff 50%)")),
+    "monochrome":G("Jedna barva nebo odstíny šedi.","Один цвет или оттенки серого.","One color / grayscale only.",SW("linear-gradient(135deg,#2b2b2b,#bdbdbd)")),
+    "earth tones":G("Hnědé, okrové, přírodní tóny.","Коричневые, охра, природные тона.","Browns, ochres, natural muted colors.",SW("linear-gradient(135deg,#8A6D3B,#B7A17E,#5E4B32)")),
+    "neon palette":G("Jasné zářivé neonové barvy.","Яркие светящиеся неоновые цвета.","Bright, glowing electric colors.",SW("linear-gradient(135deg,#FF2ED1,#22E0FF)")),
+    "teal and orange":G("Oblíbená filmová dvojice barev.","Популярная киношная пара цветов.","Popular cinema color combo.",SW("linear-gradient(135deg,#0E9384,#E8843C)")),
+    "desaturated":G("Barvy potlačené směrem k šedé.","Приглушённые, ближе к серому.","Colors dialed down toward gray.",SW("linear-gradient(135deg,#9AA0A7,#C6C9CE)")),
+    /* environment */
+    "studio backdrop":G("Jednobarevné studiové pozadí.","Однотонный студийный фон.","Plain, seamless studio background."),
+    "dense forest":G("Hustý les kolem dokola.","Густой лес вокруг.","Thick woods, trees all around."),
+    "neon-lit city street":G("Noční ulice ozářená neonem.","Ночная улица в неоне.","Night street lit by neon signs."),
+    "misty mountains":G("Mlhavá horská krajina.","Туманный горный пейзаж.","Foggy mountain landscape."),
+    "cozy interior":G("Teplý útulný interiér.","Тёплое уютное помещение.","Warm, comfortable indoor space."),
+    "desert dunes":G("Zvlněné písečné duny.","Песчаные дюны.","Rolling sand-dune landscape."),
+    "underwater":G("Podvodní scéna.","Подводная сцена.","Submerged, underwater scene."),
+    "futuristic lab":G("Špičková high-tech laboratoř.","Хай-тек лаборатория будущего.","Sleek, high-tech laboratory."),
+    /* camera movement */
+    "static shot":G("Kamera se vůbec nehýbe.","Камера неподвижна.","Camera doesn't move at all.","dg:stat"),
+    "slow push-in":G("Kamera se pomalu přibližuje.","Камера медленно приближается.","Camera slowly moves toward the subject.","dg:push"),
+    "pull-out":G("Kamera couvá a odhaluje víc.","Камера отъезжает, открывая больше.","Camera moves away, revealing more.","dg:pull"),
+    "pan left":G("Kamera se otáčí na místě doleva.","Камера поворачивается влево.","Camera pivots left in place.","dg:panL"),
+    "pan right":G("Kamera se otáčí na místě doprava.","Камера поворачивается вправо.","Camera pivots right in place.","dg:panR"),
+    "tilt up":G("Kamera se naklání nahoru.","Камера наклоняется вверх.","Camera pivots upward.","dg:tiltUp"),
+    "tracking shot":G("Kamera jede podél objektu.","Камера едет вместе с объектом.","Camera moves alongside the subject.","dg:track"),
+    "dolly zoom":G("Pohyb a zoom proti sobě — vertigo.","Отъезд с зумом — эффект «вертиго».","Move + zoom opposite ways — vertigo effect.","dg:dollyzoom"),
+    "crane shot":G("Kamera stoupá či klesá svisle.","Камера поднимается/опускается по вертикали.","Camera rises or drops vertically.","dg:crane"),
+    "handheld":G("Roztřesené, „lidské“ držení z ruky.","Дрожащая съёмка с рук.","Loose, shaky, human-held feel.","dg:handheld"),
+    "orbit / arc":G("Kamera obíhá objekt po oblouku.","Камера облетает объект по дуге.","Camera circles around the subject.","dg:orbit"),
+    "drone flyover":G("Letecký přelet nad scénou.","Аэросъёмка, пролёт над сценой.","Aerial view moving over the scene.","dg:drone"),
+    "FPV":G("Rychlý pohled z první osoby.","Быстрый вид от первого лица.","Fast, first-person flying view.","dg:fpv"),
+    /* dynamics */
+    "slow motion":G("Zpomalený pohyb pod reálnou rychlost.","Замедленное движение.","Action slowed below real speed."),
+    "time-lapse":G("Dlouhý čas stlačený do sekund.","Долгое время сжато в секунды.","Long time compressed into seconds."),
+    "real-time":G("Běžná, neupravená rychlost.","Обычная скорость.","Normal, unaltered speed."),
+    "fast-paced":G("Rychlé střihy a svižný pohyb.","Быстрый монтаж и движение.","Quick cuts and rapid motion."),
+    "smooth":G("Plynule, stabilně, bez trhání.","Плавно, без рывков.","Fluid, steady, no jitter."),
+    "hyperlapse":G("Timelapse s pohybem kamery.","Таймлапс с движением камеры.","Time-lapse while the camera travels."),
+    "seamless loop":G("Konec navazuje na začátek — smyčka.","Конец совпадает с началом — цикл.","End matches start — repeats forever."),
+    "2 seconds":G("Cílová délka klipu.","Целевая длительность клипа.","Target clip length."),
+    "5 seconds":G("Cílová délka klipu.","Целевая длительность клипа.","Target clip length."),
+    "8 seconds":G("Cílová délka klipu.","Целевая длительность клипа.","Target clip length.")
+  };
+
+  function tipContent(term){
+    var g=GLOSS[term]; if(!g) return "";
+    var vis="";
+    if(g.vis){
+      if(g.vis.indexOf("sw:")===0) vis='<div class="tip-vis" style="background:'+g.vis.slice(3)+'"></div>';
+      else if(g.vis.indexOf("dg:")===0) vis='<div class="tip-vis">'+DG(g.vis.slice(3))+'</div>';
+    }
+    return vis+'<div class="tip-term">'+term+'</div><div class="tip-def">'+g.def[lang]+'</div>';
+  }
+  var tipEl=null;
+  function showTip(anchor,term){
+    if(!GLOSS[term]) return;
+    if(!tipEl) tipEl=document.getElementById("tip");
+    tipEl.innerHTML=tipContent(term); tipEl.classList.add("show");
+    var r=anchor.getBoundingClientRect(), tr=tipEl.getBoundingClientRect();
+    var left=Math.max(8,Math.min(r.left+r.width/2-tr.width/2, window.innerWidth-tr.width-8));
+    var top=r.top-tr.height-8; if(top<8) top=r.bottom+8;
+    tipEl.style.left=left+"px"; tipEl.style.top=top+"px";
+  }
+  function hideTip(){ if(!tipEl) tipEl=document.getElementById("tip"); tipEl.classList.remove("show"); }
+
+  function F(id,tag,size,label,hint,ph,opt){
+    var o={id:id,tag:tag,size:size,label:label,hint:hint,ph:ph};
+    if(opt){ if(opt.chips)o.chips=opt.chips; if(opt.special)o.special=true; if(opt.code)o.code=true; }
+    return o;
+  }
+
+  var MODES = {
+    text:{
+      tab:{ru:"Текст",en:"Text",cs:"Text"}, badge:{ru:"Текст",en:"Text",cs:"Text"},
+      aspect:null,
+      formats:[{id:"md",label:"Markdown"},{id:"xml",label:"XML"},{id:"plain",label:{ru:"Текст",en:"Text",cs:"Text"}}],
+      defFmt:"md", titleFrom:["task","role"],
+      fields:[
+        F("role","role","md",
+          {ru:"Роль",en:"Role",cs:"Role"},
+          {ru:"Кем должна выступать модель.",en:"What role the model should take.",cs:"Jakou roli má model zaujmout."},
+          {ru:"Ты — опытный UX-редактор с вниманием к деталям.",en:"You are an experienced UX writer with an eye for detail.",cs:"Jsi zkušený UX copywriter s citem pro detail."}),
+        F("context","context","md",
+          {ru:"Контекст",en:"Context",cs:"Kontext"},
+          {ru:"Фон, вводные, что уже известно.",en:"Background, inputs, what is already known.",cs:"Pozadí, vstupy, co už je známé."},
+          {ru:"Проект — мобильное приложение для планирования. Экран онбординга готов, нужно доработать тексты.",en:"The project is a mobile planner app. The onboarding screen is built; its copy needs work.",cs:"Projekt je mobilní plánovací aplikace. Obrazovka onboardingu je hotová, texty potřebují doladit."}),
+        F("task","task","md",
+          {ru:"Задача",en:"Task",cs:"Úkol"},
+          {ru:"Что конкретно нужно сделать.",en:"What exactly needs to be done.",cs:"Co přesně je potřeba udělat."},
+          {ru:"Перепиши три экрана онбординга так, чтобы они были короче и понятнее.",en:"Rewrite the three onboarding screens to be shorter and clearer.",cs:"Přepiš tři obrazovky onboardingu tak, aby byly kratší a srozumitelnější."}),
+        F("format","output_format","md",
+          {ru:"Формат ответа",en:"Output format",cs:"Formát odpovědi"},
+          {ru:"Как должен выглядеть результат.",en:"How the result should look.",cs:"Jak má výsledek vypadat."},
+          {ru:"Для каждого экрана: заголовок (до 5 слов) и подзаголовок (до 12 слов). Ответ таблицей.",en:"For each screen: a title (≤5 words) and a subtitle (≤12 words). Answer as a table.",cs:"Pro každou obrazovku: nadpis (max 5 slov) a podnadpis (max 12 slov). Odpověz tabulkou."}),
+        F("constraints","constraints","md",
+          {ru:"Ограничения",en:"Constraints",cs:"Omezení"},
+          {ru:"Чего избегать, правила, границы.",en:"What to avoid, rules, boundaries.",cs:"Čemu se vyhnout, pravidla, hranice."},
+          {ru:"Без канцелярита и восклицательных знаков. Не придумывать функции, которых нет.",en:"No corporate jargon or exclamation marks. Don't invent features that don't exist.",cs:"Bez úředničiny a vykřičníků. Nevymýšlej funkce, které neexistují."}),
+        F("tone","tone","sm",
+          {ru:"Тон и стиль",en:"Tone & style",cs:"Tón a styl"},
+          {ru:"Как должно звучать.",en:"How it should sound.",cs:"Jak to má znít."},
+          {ru:"Спокойно, дружелюбно, на «ты».",en:"Calm, friendly, informal.",cs:"Klidně, přátelsky, tykáním."}),
+        F("audience","audience","sm",
+          {ru:"Аудитория",en:"Audience",cs:"Publikum"},
+          {ru:"Для кого результат.",en:"Who the result is for.",cs:"Pro koho je výsledek určen."},
+          {ru:"Люди 25–40 лет, не техническая аудитория.",en:"People 25–40, non-technical.",cs:"Lidé 25–40 let, netechnické publikum."}),
+        F("examples","examples","md",
+          {ru:"Примеры",en:"Examples",cs:"Příklady"},
+          {ru:"Образцы желаемого (few-shot).",en:"Samples of the desired result (few-shot).",cs:"Ukázky požadovaného výsledku (few-shot)."},
+          {ru:"Плохо: «Начните ваше путешествие прямо сейчас!»\nХорошо: «Начнём. Пара шагов — и всё готово.»",en:"Bad: “Start your journey right now!”\nGood: “Let's start. A couple of steps and you're set.”",cs:"Špatně: „Začněte svou cestu právě teď!“\nDobře: „Začneme. Pár kroků a je hotovo.“"}),
+        F("notes","notes","sm",
+          {ru:"Дополнительно",en:"Notes",cs:"Poznámky"},
+          {ru:"Всё, что не вошло в остальные блоки.",en:"Anything that didn't fit the other blocks.",cs:"Cokoliv, co se nevešlo do ostatních bloků."},
+          {ru:"Если чего-то не хватает — сначала задай уточняющий вопрос.",en:"If something is missing, ask a clarifying question first.",cs:"Pokud něco chybí, nejdřív polož upřesňující otázku."})
+      ]
+    },
+
+    image:{
+      tab:{ru:"Изображение",en:"Image",cs:"Obrázek"}, badge:{ru:"Изобр.",en:"Image",cs:"Obr."},
+      aspect:{opts:["—","1:1","4:5","3:2","2:3","16:9","9:16"], def:"1:1"},
+      formats:[{id:"prose",label:{ru:"Проза",en:"Prose",cs:"Próza"}},{id:"sections",label:{ru:"Секции",en:"Sections",cs:"Sekce"}},{id:"tags",label:{ru:"Теги",en:"Tags",cs:"Tagy"}},{id:"midjourney",label:"Midjourney"}],
+      defFmt:"prose", titleFrom:["subject"],
+      fields:[
+        F("subject","subject","md",
+          {ru:"Субъект",en:"Subject",cs:"Subjekt"},
+          {ru:"Кто или что в кадре.",en:"Who or what is in frame.",cs:"Kdo nebo co je v záběru."},
+          {ru:"Рыжий кот в вязаном свитере",en:"A ginger cat in a knitted sweater",cs:"Zrzavá kočka v pleteném svetru"}),
+        F("action","action","sm",
+          {ru:"Действие / поза",en:"Action / pose",cs:"Akce / póza"},
+          {ru:"Что делает, поза.",en:"What it does, pose.",cs:"Co dělá, póza."},
+          {ru:"сидит и смотрит в окно",en:"sitting, looking out a window",cs:"sedí a dívá se z okna"}),
+        F("environment","environment","sm",
+          {ru:"Окружение",en:"Environment",cs:"Prostředí"},
+          {ru:"Место, фон, время суток.",en:"Place, background, time of day.",cs:"Místo, pozadí, denní doba."},
+          {ru:"уютная комната, дождь за окном",en:"cozy room, rain outside",cs:"útulný pokoj, déšť za oknem"},{chips:V.environment}),
+        F("composition","composition","sm",
+          {ru:"Композиция и кадр",en:"Composition & framing",cs:"Kompozice a záběr"},
+          {ru:"Крупность, ракурс, кадрирование.",en:"Shot size, angle, framing.",cs:"Velikost záběru, úhel, kadrování."},
+          {ru:"крупный план, правило третей",en:"close-up, rule of thirds",cs:"detail, pravidlo třetin"},{chips:V.composition}),
+        F("lighting","lighting","sm",
+          {ru:"Свет",en:"Lighting",cs:"Světlo"},
+          {ru:"Источник, характер, настроение света.",en:"Source, quality, mood of light.",cs:"Zdroj, charakter, nálada světla."},
+          {ru:"мягкий свет золотого часа",en:"soft golden-hour light",cs:"měkké světlo zlaté hodiny"},{chips:V.lighting}),
+        F("camera","camera","sm",
+          {ru:"Камера и оптика",en:"Camera & lens",cs:"Kamera a optika"},
+          {ru:"Фокусное, диафрагма, тип съёмки.",en:"Focal length, aperture, capture.",cs:"Ohnisko, clona, typ snímání."},
+          {ru:"85 мм, f/1.4, малая ГРИП",en:"85mm, f/1.4, shallow depth of field",cs:"85 mm, f/1.4, malá hloubka ostrosti"},{chips:V.camera}),
+        F("style","style","sm",
+          {ru:"Стиль / медиум",en:"Style / medium",cs:"Styl / médium"},
+          {ru:"Техника, референс-стиль.",en:"Technique, reference style.",cs:"Technika, referenční styl."},
+          {ru:"фотореализм, кинематографично",en:"photorealistic, cinematic",cs:"fotorealismus, filmově"},{chips:V.style}),
+        F("palette","palette","sm",
+          {ru:"Палитра и настроение",en:"Color & mood",cs:"Paleta a nálada"},
+          {ru:"Цвета, атмосфера.",en:"Colors, atmosphere.",cs:"Barvy, atmosféra."},
+          {ru:"тёплые тона, уютно",en:"warm tones, cozy",cs:"teplé tóny, útulně"},{chips:V.palette}),
+        F("references","references","sm",
+          {ru:"Референсы",en:"References",cs:"Reference"},
+          {ru:"На что ориентироваться (стиль, автор, эпоха).",en:"What to reference (style, artist, era).",cs:"Podle čeho se řídit (styl, autor, doba)."},
+          {ru:"в духе плёночной фотографии 90-х",en:"90s film photography vibe",cs:"ve stylu filmové fotografie 90. let"}),
+        F("negative","negative","sm",
+          {ru:"Негатив-промпт",en:"Negative prompt",cs:"Negativní prompt"},
+          {ru:"Чего быть НЕ должно.",en:"What must NOT appear.",cs:"Co se NEMÁ objevit."},
+          {ru:"текст, водяные знаки, лишние пальцы",en:"text, watermark, extra fingers",cs:"text, vodoznaky, přebytečné prsty"},{special:true}),
+        F("params","params","sm",
+          {ru:"Параметры",en:"Parameters",cs:"Parametry"},
+          {ru:"Флаги / настройки модели.",en:"Model flags / settings.",cs:"Přepínače / nastavení modelu."},
+          {ru:"--v 6 --style raw",en:"--v 6 --style raw",cs:"--v 6 --style raw"},{special:true})
+      ]
+    },
+
+    video:{
+      tab:{ru:"Видео",en:"Video",cs:"Video"}, badge:{ru:"Видео",en:"Video",cs:"Video"},
+      aspect:{opts:["—","16:9","9:16","1:1","21:9"], def:"16:9"},
+      formats:[{id:"prose",label:{ru:"Проза",en:"Prose",cs:"Próza"}},{id:"structured",label:{ru:"Структура",en:"Structured",cs:"Struktura"}}],
+      defFmt:"prose", titleFrom:["subject"],
+      fields:[
+        F("subject","subject","md",
+          {ru:"Субъект",en:"Subject",cs:"Subjekt"},
+          {ru:"Главный объект сцены.",en:"The main subject of the scene.",cs:"Hlavní objekt scény."},
+          {ru:"Одинокий маяк на скале",en:"A lone lighthouse on a cliff",cs:"Osamělý maják na útesu"}),
+        F("action","action","sm",
+          {ru:"Движение в кадре",en:"Motion in frame",cs:"Pohyb v záběru"},
+          {ru:"Что движется и как.",en:"What moves and how.",cs:"Co se pohybuje a jak."},
+          {ru:"волны разбиваются о камни",en:"waves crashing on the rocks",cs:"vlny narážejí na skály"}),
+        F("environment","environment","sm",
+          {ru:"Окружение",en:"Environment",cs:"Prostředí"},
+          {ru:"Место, время суток, погода.",en:"Place, time of day, weather.",cs:"Místo, denní doba, počasí."},
+          {ru:"шторм, сумерки",en:"storm, dusk",cs:"bouře, soumrak"},{chips:V.environment}),
+        F("camera_move","camera_movement","sm",
+          {ru:"Движение камеры",en:"Camera movement",cs:"Pohyb kamery"},
+          {ru:"Как движется камера.",en:"How the camera moves.",cs:"Jak se kamera pohybuje."},
+          {ru:"медленный наезд, затем облёт",en:"slow push-in, then orbit",cs:"pomalý nájezd, pak oblet"},{chips:V.cameraMove}),
+        F("composition","composition","sm",
+          {ru:"Композиция",en:"Composition",cs:"Kompozice"},
+          {ru:"Крупность, ракурс.",en:"Shot size, angle.",cs:"Velikost záběru, úhel."},
+          {ru:"общий план, низкий ракурс",en:"wide shot, low angle",cs:"celek, podhled"},{chips:V.composition}),
+        F("lighting","lighting","sm",
+          {ru:"Свет",en:"Lighting",cs:"Světlo"},
+          {ru:"Характер и источник света.",en:"Quality and source of light.",cs:"Charakter a zdroj světla."},
+          {ru:"контровой свет маяка",en:"backlight from the lighthouse",cs:"protisvětlo z majáku"},{chips:V.lighting}),
+        F("style","style","sm",
+          {ru:"Стиль / медиум",en:"Style / medium",cs:"Styl / médium"},
+          {ru:"Визуальная манера.",en:"Visual treatment.",cs:"Vizuální pojetí."},
+          {ru:"кинематографично, плёночное зерно",en:"cinematic, film grain",cs:"filmově, filmové zrno"},{chips:V.style}),
+        F("mood","mood","sm",
+          {ru:"Настроение и палитра",en:"Mood & palette",cs:"Nálada a paleta"},
+          {ru:"Атмосфера, цвета.",en:"Atmosphere, colors.",cs:"Atmosféra, barvy."},
+          {ru:"тревожно, холодные тона",en:"ominous, cool tones",cs:"tísnivě, studené tóny"},{chips:V.palette}),
+        F("dynamics","dynamics","sm",
+          {ru:"Динамика и темп",en:"Pace & dynamics",cs:"Dynamika a tempo"},
+          {ru:"Скорость, длительность, ритм.",en:"Speed, duration, rhythm.",cs:"Rychlost, délka, rytmus."},
+          {ru:"slow-motion, 5 секунд",en:"slow motion, 5 seconds",cs:"zpomaleně, 5 sekund"},{chips:V.dynamics}),
+        F("arc","scene_arc","md",
+          {ru:"Развитие сцены",en:"Scene arc",cs:"Vývoj scény"},
+          {ru:"Начало → конец: как меняется сцена.",en:"Start → end: how the scene evolves.",cs:"Začátek → konec: jak se scéna vyvíjí."},
+          {ru:"камера поднимается от волн к вершине маяка",en:"camera rises from the waves up to the lighthouse top",cs:"kamera stoupá od vln k vrcholu majáku"}),
+        F("params","params","sm",
+          {ru:"Параметры",en:"Parameters",cs:"Parametry"},
+          {ru:"Модель, длительность, формат.",en:"Model, duration, format.",cs:"Model, délka, formát."},
+          {ru:"8s / model: veo",en:"8s / model: veo",cs:"8s / model: veo"},{special:true})
+      ]
+    },
+
+    code:{
+      tab:{ru:"Код",en:"Code",cs:"Kód"}, badge:{ru:"Код",en:"Code",cs:"Kód"},
+      aspect:null,
+      formats:[{id:"prose",label:{ru:"Проза",en:"Prose",cs:"Próza"}},{id:"xml",label:"XML"},{id:"spec",label:{ru:"Спека",en:"Spec",cs:"Spec"}}],
+      defFmt:"xml", titleFrom:["task"],
+      fields:[
+        F("stack","stack","sm",
+          {ru:"Стек",en:"Stack",cs:"Stack"},
+          {ru:"Язык, фреймворк, версии.",en:"Language, framework, versions.",cs:"Jazyk, framework, verze."},
+          {ru:"React 18 + TypeScript, Tailwind, Vite",en:"React 18 + TypeScript, Tailwind, Vite",cs:"React 18 + TypeScript, Tailwind, Vite"}),
+        F("task","task","md",
+          {ru:"Что строим",en:"What we build",cs:"Co stavíme"},
+          {ru:"Фича, компонент или скрипт — сама задача.",en:"Feature, component or script — the task itself.",cs:"Funkce, komponenta nebo skript — samotný úkol."},
+          {ru:"Добавить переключатель тёмной темы в шапку",en:"Add a dark-mode toggle to the header",cs:"Přidat přepínač tmavého režimu do hlavičky"}),
+        F("existing_code","code","md",
+          {ru:"Существующий код",en:"Existing code",cs:"Stávající kód"},
+          {ru:"Фрагмент, который надо дополнить или отрефакторить. Отступы сохраняются.",en:"The snippet to extend or refactor. Indentation is preserved.",cs:"Úsek k rozšíření nebo refaktoru. Odsazení se zachová."},
+          {ru:"export function Header() {\n  return <header>…</header>\n}",en:"export function Header() {\n  return <header>…</header>\n}",cs:"export function Header() {\n  return <header>…</header>\n}"},{code:true}),
+        F("contract","contract","sm",
+          {ru:"Контракт",en:"Contract",cs:"Kontrakt"},
+          {ru:"Входы/выходы, сигнатуры, типы.",en:"Inputs/outputs, signatures, types.",cs:"Vstupy/výstupy, signatury, typy."},
+          {ru:"toggleTheme(): void; тема хранится в localStorage",en:"toggleTheme(): void; theme persisted in localStorage",cs:"toggleTheme(): void; téma uložené v localStorage"}),
+        F("constraints","constraints","sm",
+          {ru:"Ограничения",en:"Constraints",cs:"Omezení"},
+          {ru:"Стиль, паттерны, что не трогать.",en:"Style, patterns, what not to touch.",cs:"Styl, vzory, čeho se nedotýkat."},
+          {ru:"Без новых зависимостей, в стиле существующего кода",en:"No new dependencies, match the existing style",cs:"Žádné nové závislosti, ve stylu stávajícího kódu"},
+          {chips:["no external deps","match existing style","functional style","typed","handle errors","no comments","keep it minimal","async/await"]}),
+        F("testing","acceptance","sm",
+          {ru:"Как проверять",en:"Testing / done",cs:"Jak ověřit"},
+          {ru:"Тесты, критерии готовности.",en:"Tests, acceptance criteria.",cs:"Testy, kritéria hotovosti."},
+          {ru:"Тема переключается и не сбрасывается после перезагрузки",en:"Theme toggles and survives a reload",cs:"Téma se přepíná a přežije reload"}),
+        F("response","response_format","sm",
+          {ru:"Вид ответа",en:"Response shape",cs:"Podoba odpovědi"},
+          {ru:"Только код / +объяснение / diff / пошагово.",en:"Only code / +explanation / diff / step by step.",cs:"Jen kód / +vysvětlení / diff / krok za krokem."},
+          {ru:"Только изменённые файлы, кратким diff",en:"Only changed files, as a short diff",cs:"Jen změněné soubory, jako krátký diff"},
+          {chips:["only code","explain then code","unified diff","step by step","with tests","minimal changes"]})
+      ]
+    }
+  };
+
+  var STRUCT={aspect:{ru:"КАДР",en:"ASPECT",cs:"POMĚR"},params:{ru:"ПАРАМЕТРЫ",en:"PARAMETERS",cs:"PARAMETRY"}};
+
+  var L = {
+    cs:{mark:"offline · 3 režimy",title:"Konstruktor promptů",
+      sub:"Skládej prompty pro text, obrázky a video z hotových částí.",
+      components:"Součásti",fillWord:"bloků",clearAll:"Vymazat vše",prompt:"Prompt",
+      empty:"Vyplň bloky vlevo — tady se objeví hotový prompt.",
+      save:"Do historie",saved:"Uloženo ✓",download:"Stáhnout .txt",copy:"Kopírovat",copied:"Zkopírováno ✓",
+      hist:"Historie",histTitle:"Historie promptů",
+      histEmpty:"Zatím prázdné.\nKlikni na „Do historie“ a ulož aktuální prompt.",
+      restore:"Obnovit",del:"Smazat",clearHist:"Vymazat historii",
+      footL:"Jeden soubor. Nic neodchází do sítě — vše se ukládá lokálně v prohlížeči.",
+      confirmClear:"Vymazat všechny bloky této záložky?",confirmClearHist:"Vymazat celou historii?",
+      untitled:"Bez názvu",clearSure:"Opravdu?",loc:"cs-CZ",aspectLbl:"poměr",
+      fmtNames:{md:"Markdown",xml:"XML značky",plain:"Prostý text",prose:"Próza",tags:"Tagy",midjourney:"Midjourney",structured:"Struktura"},
+      countFn:function(c,w){return c+" znaků · "+w+" slov";},
+      fmtNoteFn:function(x){return "Formát: "+x;}},
+    ru:{mark:"офлайн · 3 режима",title:"Конструктор промптов",
+      sub:"Собирай промпты для текста, изображений и видео из готовых составляющих.",
+      components:"Составляющие",fillWord:"блоков",clearAll:"Очистить всё",prompt:"Промпт",
+      empty:"Заполни блоки слева — здесь появится готовый промпт.",
+      save:"В историю",saved:"Сохранено ✓",download:"Скачать .txt",copy:"Копировать",copied:"Скопировано ✓",
+      hist:"История",histTitle:"История промптов",
+      histEmpty:"Пока пусто.\nНажми «В историю», чтобы сохранить текущий промпт.",
+      restore:"Восстановить",del:"Удалить",clearHist:"Очистить историю",
+      footL:"Один файл. Ничего не уходит в сеть — всё хранится локально в браузере.",
+      confirmClear:"Очистить все блоки этой вкладки?",confirmClearHist:"Очистить всю историю?",
+      untitled:"Без названия",clearSure:"Точно?",loc:"ru-RU",aspectLbl:"кадр",
+      fmtNames:{md:"Markdown",xml:"XML-теги",plain:"Простой текст",prose:"Проза",tags:"Теги",midjourney:"Midjourney",structured:"Структура"},
+      countFn:function(c,w){return c+" симв · "+w+" слов";},
+      fmtNoteFn:function(x){return "Формат: "+x;}},
+    en:{mark:"offline · 3 modes",title:"Prompt Constructor",
+      sub:"Build prompts for text, images and video from ready-made parts.",
+      components:"Components",fillWord:"blocks",clearAll:"Clear all",prompt:"Prompt",
+      empty:"Fill the blocks on the left — your prompt appears here.",
+      save:"Save",saved:"Saved ✓",download:"Download .txt",copy:"Copy",copied:"Copied ✓",
+      hist:"History",histTitle:"Prompt history",
+      histEmpty:"Empty for now.\nClick “Save” to store the current prompt.",
+      restore:"Restore",del:"Delete",clearHist:"Clear history",
+      footL:"One file. Nothing leaves the network — everything is stored locally in the browser.",
+      confirmClear:"Clear all blocks on this tab?",confirmClearHist:"Clear the entire history?",
+      untitled:"Untitled",clearSure:"Sure?",loc:"en-US",aspectLbl:"frame",
+      fmtNames:{md:"Markdown",xml:"XML tags",plain:"Plain text",prose:"Prose",tags:"Tags",midjourney:"Midjourney",structured:"Structured"},
+      countFn:function(c,w){return c+" chars · "+w+" words";},
+      fmtNoteFn:function(x){return "Format: "+x;}}
+  };
+  var HINTS = {
+    text:{md:{ru:"Markdown — заголовки секций.",en:"Markdown — section headers.",cs:"Markdown — nadpisy sekcí."},
+      xml:{ru:"XML-теги — как в обучении Claude.",en:"XML tags — how Claude is trained.",cs:"XML značky — jak je trénovaný Claude."},
+      plain:{ru:"Простой текст — метки капсом.",en:"Plain text — uppercase labels.",cs:"Prostý text — popisky velkými písmeny."}},
+    image:{prose:{ru:"Проза — для Flux, DALL·E, Ideogram, Sora.",en:"Prose — for Flux, DALL·E, Ideogram, Sora.",cs:"Próza — pro Flux, DALL·E, Ideogram, Sora."},
+      sections:{ru:"Секции — метки по осям, максимум контроля.",en:"Sections — labeled axes, maximum control.",cs:"Sekce — popsané osy, maximální kontrola."},
+      tags:{ru:"Теги — для SDXL и локальных моделей, негатив отдельным блоком.",en:"Tags — for SDXL and local models, negative as a separate block.",cs:"Tagy — pro SDXL a lokální modely, negativ jako samostatný blok."},
+      midjourney:{ru:"Midjourney — проза + флаги (--ar, --no).",en:"Midjourney — prose + flags (--ar, --no).",cs:"Midjourney — próza + přepínače (--ar, --no)."}},
+    video:{prose:{ru:"Проза — для Sora, Veo, Kling, Runway.",en:"Prose — for Sora, Veo, Kling, Runway.",cs:"Próza — pro Sora, Veo, Kling, Runway."},
+      structured:{ru:"Структура — спека по осям, удобно для раскадровки.",en:"Structured — a spec by axis, good for storyboards.",cs:"Struktura — rozpis podle os, vhodné pro storyboard."}},
+    code:{prose:{ru:"Проза — обычный промпт для Claude, ChatGPT.",en:"Prose — a plain prompt for Claude, ChatGPT.",cs:"Próza — běžný prompt pro Claude, ChatGPT."},
+      xml:{ru:"XML-теги — точнее всего для Claude и Claude Code.",en:"XML tags — most precise for Claude and Claude Code.",cs:"XML značky — nejpřesnější pro Claude a Claude Code."},
+      spec:{ru:"Спека — структурное ТЗ для Cursor, v0, агентов.",en:"Spec — a structured brief for Cursor, v0, agents.",cs:"Spec — strukturované zadání pro Cursor, v0, agenty."}}
+  };
+
+  var DRAFT_KEY="prompt-constructor-draft-v3", HIST_KEY="prompt-constructor-history-v3";
+  var lang="cs", mode="text";
+  var states={}, fmts={}, aspects={};
+  Object.keys(MODES).forEach(function(m){
+    states[m]={}; MODES[m].fields.forEach(function(f){ states[m][f.id]=""; });
+    fmts[m]=MODES[m].defFmt; aspects[m]=MODES[m].aspect?MODES[m].aspect.def:null;
+  });
+  var history=[];
+
+  try{
+    var d=JSON.parse(localStorage.getItem(DRAFT_KEY)||"{}");
+    if(d.lang&&L[d.lang])lang=d.lang; if(d.mode&&MODES[d.mode])mode=d.mode;
+    if(d.states)Object.keys(states).forEach(function(m){
+      if(d.states[m])MODES[m].fields.forEach(function(f){ states[m][f.id]=d.states[m][f.id]||""; });});
+    if(d.fmts)Object.keys(fmts).forEach(function(m){ if(d.fmts[m])fmts[m]=d.fmts[m]; });
+    if(d.aspects)Object.keys(aspects).forEach(function(m){ if(d.aspects[m]!==undefined)aspects[m]=d.aspects[m]; });
+  }catch(e){}
+  try{ var h=JSON.parse(localStorage.getItem(HIST_KEY)||"[]"); if(Array.isArray(h))history=h; }catch(e){}
+
+  function persistDraft(){ try{ localStorage.setItem(DRAFT_KEY,JSON.stringify(
+    {lang:lang,mode:mode,states:states,fmts:fmts,aspects:aspects})); }catch(e){} }
+  function persistHistory(){ try{ localStorage.setItem(HIST_KEY,JSON.stringify(history)); }catch(e){} }
+
+  var T=function(){ return L[lang]; };
+  var lbl=function(x){ return typeof x==="string"?x:x[lang]; };
+  var st=function(){ return states[mode]; };
+
+  function cap(s){ return s?s.charAt(0).toUpperCase()+s.slice(1):s; }
+  function dedupList(arr){
+    var seen={}, out=[];
+    arr.join(", ").split(",").forEach(function(p){
+      var t=p.trim(); if(!t) return; var k=t.toLowerCase(); if(seen[k]) return; seen[k]=1; out.push(t);
+    });
+    return out.join(", ");
+  }
+  function tidy(s){
+    return s.replace(/[ \t]+/g," ").replace(/ +([,.;:!?])/g,"$1")
+            .replace(/,\s*(?=,)/g,"").replace(/,{2,}/g,",")
+            .replace(/[ \t]+\n/g,"\n").replace(/,\s*\n/g,"\n")
+            .replace(/^[\s,]+|[\s,]+$/g,"");
+  }
+
+  function nonEmpty(ids){ return ids.map(function(id){ return (st()[id]||"").trim(); })
+    .filter(function(v){ return v.length>0; }); }
+
+  function composeText(){
+    var flds=MODES.text.fields.filter(function(f){ return st()[f.id].trim(); });
+    if(!flds.length) return "";
+    var f=fmts.text;
+    return flds.map(function(fl){
+      var b=st()[fl.id].trim();
+      if(f==="xml")return "<"+fl.tag+">\n"+b+"\n</"+fl.tag+">";
+      if(f==="plain")return fl.label[lang].toUpperCase()+":\n"+b;
+      return "## "+fl.label[lang]+"\n"+b;
+    }).join("\n\n");
+  }
+
+  function composeImage(){
+    var desc=nonEmpty(["subject","action","environment","composition","lighting","camera","style","palette","references"]);
+    var neg=(st().negative||"").trim(), params=(st().params||"").trim();
+    var ar=aspects.image, arOn=ar&&ar!=="—", f=fmts.image;
+    if(!desc.length&&!neg&&!params) return "";
+    if(f==="midjourney"){
+      var flags=[]; if(arOn)flags.push("--ar "+ar); if(params)flags.push(params); if(neg)flags.push("--no "+neg);
+      return dedupList(desc)+(flags.length?" "+flags.join(" "):"");
+    }
+    if(f==="tags"){
+      var main=dedupList(desc).toLowerCase(), tail=[];
+      if(arOn)tail.push("aspect ratio "+ar); if(params)tail.push(params.toLowerCase());
+      if(tail.length)main=(main?main+", ":"")+tail.join(", ");
+      var outT=main; if(neg)outT+=(main?"\n\n":"")+"Negative prompt:\n"+dedupList([neg]).toLowerCase();
+      return outT;
+    }
+    var g=function(id){ return (st()[id]||"").trim(); };
+    if(f==="sections"){
+      var byId={}; MODES.image.fields.forEach(function(fl){ byId[fl.id]=fl; });
+      var sl=[];
+      ["subject","action","environment","composition","lighting","camera","style","palette","references"].forEach(function(id){
+        var v=g(id); if(v) sl.push(byId[id].label[lang]+": "+v);
+      });
+      if(arOn) sl.push(cap(T().aspectLbl)+": "+ar);
+      if(params) sl.push(byId.params.label[lang]+": "+params);
+      if(neg) sl.push(byId.negative.label[lang]+": "+neg);
+      return sl.join("\n");
+    }
+    // prose — woven into sentences with natural connectors
+    var open=g("subject");
+    var act=g("action"); if(act) open=open?open+", "+act:act;
+    var env=g("environment"); if(env) open=open?open+" in "+env:"A scene in "+env;
+    var det=[];
+    var comp=g("composition"); if(comp) det.push(comp);
+    var light=g("lighting"); if(light) det.push("lit with "+light);
+    var cam=g("camera"); if(cam) det.push("shot on "+cam);
+    var sty=g("style"); if(sty) det.push("in a "+sty+" style");
+    var pal=g("palette"); if(pal) det.push("with a "+pal+" palette");
+    var ref=g("references"); if(ref) det.push("referencing "+ref);
+    var body=tidy([open?cap(open)+".":"", det.length?cap(det.join(", "))+".":""].filter(Boolean).join(" "));
+    var extra=[];
+    if(arOn)extra.push("Aspect ratio: "+ar); if(params)extra.push("Parameters: "+params); if(neg)extra.push("Avoid: "+neg);
+    return body+(extra.length?(body?"\n\n":"")+extra.join("\n"):"");
+  }
+
+  function composeVideo(){
+    var params=(st().params||"").trim(), arc=(st().arc||"").trim();
+    var ar=aspects.video, arOn=ar&&ar!=="—", f=fmts.video;
+    var g=function(id){ return (st()[id]||"").trim(); };
+    if(f==="structured"){
+      var flds=MODES.video.fields.filter(function(fl){ return fl.id!=="params"&&st()[fl.id].trim(); });
+      if(!flds.length&&!params&&!arOn) return "";
+      var parts=flds.map(function(fl){ return fl.label[lang].toUpperCase()+":\n"+st()[fl.id].trim(); });
+      if(arOn)parts.push(STRUCT.aspect[lang]+":\n"+ar);
+      if(params)parts.push(STRUCT.params[lang]+":\n"+params);
+      return parts.join("\n\n");
+    }
+    var any=MODES.video.fields.some(function(fl){ return fl.id!=="params"&&st()[fl.id].trim(); })||params;
+    if(!any) return "";
+    // prose — subject sentence, motion/look sentence, then the scene arc
+    var open=g("subject");
+    var act=g("action"); if(act) open=open?open+", "+act:act;
+    var env=g("environment"); if(env) open=open?open+" in "+env:"A scene in "+env;
+    var det=[];
+    var comp=g("composition"); if(comp) det.push(comp);
+    var cm=g("camera_move"); if(cm) det.push("camera "+cm);
+    var light=g("lighting"); if(light) det.push("lit with "+light);
+    var sty=g("style"); if(sty) det.push("in a "+sty+" style");
+    var mood=g("mood"); if(mood) det.push(mood+" mood");
+    var dyn=g("dynamics"); if(dyn) det.push(dyn);
+    var s3=arc?cap(arc)+(/[.!?]$/.test(arc)?"":"."):"";
+    var body=tidy([open?cap(open)+".":"", det.length?cap(det.join(", "))+".":"", s3].filter(Boolean).join(" "));
+    var extra=[]; if(arOn)extra.push("Aspect ratio: "+ar); if(params)extra.push("Parameters: "+params);
+    return body+(extra.length?(body?"\n\n":"")+extra.join("\n"):"");
+  }
+
+  function composeCode(){
+    var flds=MODES.code.fields.filter(function(fl){ return st()[fl.id].trim(); });
+    if(!flds.length) return "";
+    var f=fmts.code;
+    function fence(v){ return "```\n"+v+"\n```"; }
+    return flds.map(function(fl){
+      var v=st()[fl.id].trim(), isCode=fl.code;
+      if(f==="xml"){ var tag=isCode?"code":fl.tag; return "<"+tag+">\n"+v+"\n</"+tag+">"; }
+      if(f==="spec"){ return fl.label[lang].toUpperCase()+"\n"+(isCode?fence(v):v); }
+      return isCode?(fl.label[lang]+":\n"+fence(v)):(fl.label[lang]+": "+v);
+    }).join("\n\n");
+  }
+
+  function compose(){ return mode==="text"?composeText():mode==="image"?composeImage():mode==="video"?composeVideo():composeCode(); }
+
+  var form=document.getElementById("form");
+  var out=document.getElementById("out"), countEl=document.getElementById("count");
+  var fillN=document.getElementById("fillN"), fillT=document.getElementById("fillT");
+  var copyBtn=document.getElementById("copyBtn"), dlBtn=document.getElementById("dlBtn"), saveBtn=document.getElementById("saveBtn");
+  var fmtControl=document.getElementById("fmtControl"), fmtHint=document.getElementById("fmtHint");
+  var aspectBar=document.getElementById("aspectBar"), fmtNote=document.getElementById("fmtNote");
+  var histList=document.getElementById("histList"), histCount=document.getElementById("histCount");
+  var clearAllBtn=document.getElementById("clearBtn");
+  var fieldEls=[];
+
+  function setField(id,val){
+    st()[id]=val;
+    var fe=fieldEls.find(function(x){ return x.id===id; });
+    if(fe){ fe.ta.value=val; fe.block.classList.toggle("filled",val.trim().length>0); }
+    render(); persistDraft();
+  }
+
+  function buildForm(){
+    form.innerHTML=""; fieldEls=[];
+    var flds=MODES[mode].fields; fillT.textContent=flds.length;
+    flds.forEach(function(f,i){
+      var num=String(i+1).padStart(2,"0");
+      var block=document.createElement("div");
+      block.className="block"+(f.special?" special":"");
+      block.innerHTML='<div class="lbl"><span class="num">'+num+'</span>'+
+        '<label for="fld-'+f.id+'"></label>'+
+        '<button type="button" class="clr" aria-label="'+CLR_LABEL[lang]+'" title="'+CLR_LABEL[lang]+'">×</button>'+
+        '</div><p class="hint"></p>'+
+        '<textarea id="fld-'+f.id+'" class="'+f.size+(f.code?" codearea":"")+'"></textarea>';
+      form.appendChild(block);
+      var ta=block.querySelector("textarea");
+      var lab=block.querySelector("label"); lab.textContent=f.label[lang]; lab.setAttribute("for","fld-"+f.id);
+      block.querySelector(".hint").textContent=f.hint[lang];
+      ta.placeholder=f.ph[lang]; ta.value=st()[f.id];
+      block.classList.toggle("filled",st()[f.id].trim().length>0);
+      ta.addEventListener("input",function(){
+        st()[f.id]=ta.value; block.classList.toggle("filled",ta.value.trim().length>0);
+        render(); persistDraft();
+      });
+      block.querySelector(".clr").addEventListener("click",function(){ setField(f.id,""); });
+      if(f.chips){
+        var wrap=document.createElement("div"); wrap.className="chips";
+        f.chips.forEach(function(term){
+          var b=document.createElement("button"); b.type="button"; b.textContent=term;
+          if(GLOSS[term]) b.classList.add("hasinfo");
+          b.addEventListener("click",function(){
+            hideTip();
+            var cur=st()[f.id]||"";
+            if(cur.toLowerCase().indexOf(term.toLowerCase())!==-1) return;
+            setField(f.id,cur.trim()?cur.trim().replace(/,\s*$/,"")+", "+term:term);
+          });
+          b.addEventListener("mouseenter",function(){ showTip(b,term); });
+          b.addEventListener("mouseleave",hideTip);
+          b.addEventListener("focus",function(){ showTip(b,term); });
+          b.addEventListener("blur",hideTip);
+          wrap.appendChild(b);
+        });
+        block.appendChild(wrap);
+      }
+      fieldEls.push({id:f.id,block:block,ta:ta});
+    });
+  }
+
+  function buildFormatControl(){
+    fmtControl.innerHTML="";
+    MODES[mode].formats.forEach(function(o){
+      var b=document.createElement("button");
+      b.dataset.fmt=o.id; b.textContent=lbl(o.label);
+      b.setAttribute("aria-pressed",String(o.id===fmts[mode]));
+      b.addEventListener("click",function(){ setFmt(o.id); });
+      fmtControl.appendChild(b);
+    });
+  }
+
+  function buildAspectBar(){
+    var cfg=MODES[mode].aspect;
+    if(!cfg){ aspectBar.style.display="none"; aspectBar.innerHTML=""; return; }
+    aspectBar.style.display="flex"; aspectBar.innerHTML="";
+    var lb=document.createElement("span"); lb.className="ar-lbl"; lb.textContent=T().aspectLbl; aspectBar.appendChild(lb);
+    cfg.opts.forEach(function(op){
+      var b=document.createElement("button"); b.textContent=op;
+      b.setAttribute("aria-pressed",String(op===aspects[mode]));
+      b.addEventListener("click",function(){ aspects[mode]=op; buildAspectBar(); render(); persistDraft(); });
+      aspectBar.appendChild(b);
+    });
+  }
+
+  function renderFmtHint(){
+    var h=HINTS[mode]&&HINTS[mode][fmts[mode]];
+    fmtHint.textContent=h?h[lang]:"";
+    fmtNote.textContent=T().fmtNoteFn(T().fmtNames[fmts[mode]]);
+  }
+
+  function render(){
+    var text=compose();
+    var filledN=MODES[mode].fields.filter(function(f){ return st()[f.id].trim(); }).length;
+    fillN.textContent=filledN;
+    clearAllBtn.disabled=filledN===0;
+    if(!text){
+      out.textContent=T().empty; out.classList.add("empty");
+      countEl.textContent=T().countFn(0,0);
+      copyBtn.disabled=dlBtn.disabled=saveBtn.disabled=true; return;
+    }
+    out.textContent=text; out.classList.remove("empty");
+    var words=text.trim().split(/\s+/).filter(Boolean).length;
+    countEl.textContent=T().countFn(text.length.toLocaleString(T().loc),words.toLocaleString(T().loc));
+    copyBtn.disabled=dlBtn.disabled=saveBtn.disabled=false;
+  }
+
+  function setFmt(v){
+    fmts[mode]=v;
+    Array.prototype.forEach.call(fmtControl.children,function(b){
+      b.setAttribute("aria-pressed",String(b.dataset.fmt===v)); });
+    renderFmtHint(); render(); persistDraft();
+  }
+
+  function applyStatic(){
+    document.documentElement.lang=lang;
+    var m={"ui-mark":"mark","ui-title":"title","ui-sub":"sub","ui-components":"components",
+      "ui-prompt":"prompt","ui-hist":"hist","ui-histTitle":"histTitle","ui-footL":"footL",
+      "fillWord":"fillWord","clearBtn":"clearAll","histClear":"clearHist"};
+    Object.keys(m).forEach(function(id){ document.getElementById(id).textContent=T()[m[id]]; });
+    dlBtn.textContent=T().download; saveBtn.textContent=T().save;
+    if(!copyBtn.classList.contains("done"))copyBtn.textContent=T().copy;
+    document.querySelectorAll("[data-tab]").forEach(function(el){ el.textContent=MODES[el.dataset.tab].tab[lang]; });
+  }
+
+  function switchMode(m){
+    mode=m; document.body.dataset.mode=m;
+    document.querySelectorAll(".tab").forEach(function(t){
+      t.setAttribute("aria-selected",String(t.dataset.mode===m)); });
+    buildForm(); buildFormatControl(); buildAspectBar(); renderFmtHint(); render(); persistDraft();
+  }
+
+  function setLang(v){
+    lang=v;
+    document.querySelectorAll(".segmented.lang button").forEach(function(b){
+      b.setAttribute("aria-pressed",String(b.dataset.lang===v)); });
+    applyStatic(); buildForm(); buildAspectBar(); renderFmtHint(); render(); renderHistory(); persistDraft();
+  }
+
+  function copyText(text,btn,ok,reset){
+    var done=function(){ btn.textContent=ok; btn.classList.add("done");
+      setTimeout(function(){ btn.textContent=reset; btn.classList.remove("done"); },1400); };
+    if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(done,fb); } else { fb(); }
+    function fb(){ var t=document.createElement("textarea"); t.value=text; t.style.position="fixed"; t.style.opacity="0";
+      document.body.appendChild(t); t.select(); try{ document.execCommand("copy"); done(); }catch(e){} document.body.removeChild(t); }
+  }
+  copyBtn.addEventListener("click",function(){ var x=compose(); if(x)copyText(x,copyBtn,T().copied,T().copy); });
+  dlBtn.addEventListener("click",function(){
+    var x=compose(); if(!x)return;
+    var blob=new Blob([x],{type:"text/plain;charset=utf-8"}), url=URL.createObjectURL(blob);
+    var a=document.createElement("a"); a.href=url; a.download="prompt-"+mode+"-"+fmts[mode]+".txt";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); },500);
+  });
+  function armConfirm(btn,label,action){
+    if(btn.dataset.armed==="1"){
+      clearTimeout(btn._t); btn.dataset.armed="0"; btn.classList.remove("arm");
+      btn.textContent=btn._orig; action(); return;
+    }
+    btn._orig=btn.textContent; btn.textContent=label; btn.classList.add("arm"); btn.dataset.armed="1";
+    btn._t=setTimeout(function(){
+      btn.dataset.armed="0"; btn.classList.remove("arm"); btn.textContent=btn._orig;
+    },3000);
+  }
+
+  clearAllBtn.addEventListener("click",function(){
+    if(clearAllBtn.disabled) return;
+    armConfirm(clearAllBtn,T().clearSure,function(){
+      MODES[mode].fields.forEach(function(f){ st()[f.id]=""; });
+      buildForm(); render(); persistDraft();
+    });
+  });
+
+  function makeTitle(){
+    var keys=MODES[mode].titleFrom, raw="";
+    for(var i=0;i<keys.length&&!raw;i++)raw=(st()[keys[i]]||"").trim();
+    raw=raw.replace(/\s+/g," ");
+    if(!raw)return T().untitled;
+    return raw.length>52?raw.slice(0,52)+"…":raw;
+  }
+  function fmtTime(ts){ try{ return new Date(ts).toLocaleString(T().loc,
+    {day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}); }catch(e){ return ""; } }
+
+  function saveSnapshot(){
+    var text=compose(); if(!text)return;
+    history.unshift({id:Date.now()+"-"+Math.random().toString(36).slice(2,7),ts:Date.now(),
+      mode:mode,fmt:fmts[mode],aspect:aspects[mode],title:makeTitle(),
+      state:JSON.parse(JSON.stringify(st())),text:text});
+    if(history.length>60)history=history.slice(0,60);
+    persistHistory(); renderHistory();
+    saveBtn.textContent=T().saved; saveBtn.classList.add("done");
+    setTimeout(function(){ saveBtn.textContent=T().save; saveBtn.classList.remove("done"); },1300);
+  }
+  saveBtn.addEventListener("click",saveSnapshot);
+
+  function restoreEntry(id){
+    var e=history.find(function(x){ return x.id===id; }); if(!e)return;
+    var m=e.mode&&MODES[e.mode]?e.mode:"text";
+    MODES[m].fields.forEach(function(f){ states[m][f.id]=(e.state&&e.state[f.id])||""; });
+    if(e.fmt)fmts[m]=e.fmt;
+    if(e.aspect!==undefined&&MODES[m].aspect)aspects[m]=e.aspect;
+    switchMode(m); closeDrawer();
+  }
+  function deleteEntry(id){ history=history.filter(function(x){ return x.id!==id; }); persistHistory(); renderHistory(); }
+
+  function renderHistory(){
+    histCount.textContent=history.length;
+    if(!history.length){ histList.innerHTML='<div class="hist-empty">'+T().histEmpty.replace(/\n/g,"<br>")+'</div>'; return; }
+    histList.innerHTML="";
+    history.forEach(function(e){
+      var m=e.mode||"text";
+      var card=document.createElement("div"); card.className="entry";
+      card.innerHTML='<div class="entry-top">'+
+        '<span class="mode-badge mb-'+m+'">'+MODES[m].badge[lang]+'</span>'+
+        '<span class="fmt-badge">'+(e.fmt||"")+'</span>'+
+        '<span class="ts">'+fmtTime(e.ts)+'</span></div>'+
+        '<p class="etitle"></p><p class="eprev"></p>'+
+        '<div class="entry-acts"><button data-a="restore">'+T().restore+'</button>'+
+        '<button data-a="copy">'+T().copy+'</button>'+
+        '<button data-a="del" class="danger">'+T().del+'</button></div>';
+      card.querySelector(".etitle").textContent=e.title||T().untitled;
+      card.querySelector(".eprev").textContent=e.text.replace(/\s+/g," ").trim();
+      card.querySelector('[data-a="restore"]').addEventListener("click",function(){ restoreEntry(e.id); });
+      card.querySelector('[data-a="del"]').addEventListener("click",function(){ deleteEntry(e.id); });
+      card.querySelector('[data-a="copy"]').addEventListener("click",function(ev){ copyText(e.text,ev.currentTarget,T().copied,T().copy); });
+      histList.appendChild(card);
+    });
+  }
+  document.getElementById("histClear").addEventListener("click",function(){
+    if(!history.length)return;
+    armConfirm(this,T().clearSure,function(){ history=[]; persistHistory(); renderHistory(); });
+  });
+
+  function openDrawer(){ document.body.classList.add("hist-open"); }
+  function closeDrawer(){ document.body.classList.remove("hist-open"); }
+  document.getElementById("histBtn").addEventListener("click",openDrawer);
+  document.getElementById("histClose").addEventListener("click",closeDrawer);
+  document.getElementById("overlay").addEventListener("click",closeDrawer);
+  document.addEventListener("keydown",function(e){ if(e.key==="Escape"&&document.body.classList.contains("hist-open"))closeDrawer(); });
+
+  document.querySelectorAll(".tab").forEach(function(t){
+    t.addEventListener("click",function(){ if(t.dataset.mode!==mode)switchMode(t.dataset.mode); }); });
+  document.querySelectorAll(".segmented.lang button").forEach(function(b){
+    b.addEventListener("click",function(){ setLang(b.dataset.lang); });
+    b.setAttribute("aria-pressed",String(b.dataset.lang===lang)); });
+
+  window.addEventListener("scroll",hideTip,true);
+  window.addEventListener("resize",hideTip);
+
+  applyStatic();
+  switchMode(mode);
+  renderHistory();
+})();
+</script>
+</body>
+</html>
