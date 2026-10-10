@@ -1705,14 +1705,14 @@
     mode=m; document.body.dataset.mode=m;
     document.querySelectorAll(".tab").forEach(function(t){
       t.setAttribute("aria-selected",String(t.dataset.mode===m)); });
-    buildForm(); buildFormatControl(); buildAspectBar(); renderFmtHint(); render(); persistDraft();
+    buildForm(); buildFormatControl(); buildAspectBar(); renderFmtHint(); render(); renderHints(); persistDraft();
   }
 
   function setLang(v){
     lang=v;
     document.querySelectorAll(".segmented.lang button").forEach(function(b){
       b.setAttribute("aria-pressed",String(b.dataset.lang===v)); });
-    applyStatic(); buildForm(); buildAspectBar(); renderFmtHint(); render(); renderHistory(); persistDraft();
+    applyStatic(); buildForm(); buildAspectBar(); renderFmtHint(); render(); renderHints(); renderHistory(); persistDraft();
   }
 
   function copyText(text,btn,ok,reset){
