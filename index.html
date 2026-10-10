@@ -166,6 +166,7 @@
     transform:translateX(100%);transition:transform .24s cubic-bezier(.4,0,.2,1);z-index:41;display:flex;flex-direction:column}
   body.hist-open .overlay{opacity:1;pointer-events:auto}
   body.hist-open .drawer{transform:translateX(0)}
+  body:not(.hist-open) .drawer{box-shadow:none}
   .drawer-head{display:flex;align-items:center;justify-content:space-between;gap:10px;
     padding:20px 18px 15px;border-bottom:2px solid var(--ink)}
   .drawer-head .title{font-size:16px;font-weight:800;letter-spacing:-.01em}
@@ -194,6 +195,42 @@
   .entry-acts button:hover{border-color:var(--faint)}
   .entry-acts button.danger:hover{color:#B4351F;border-color:#E3A9A0}
   .drawer-foot{border-top:1px solid var(--line);padding:12px 16px}
+
+  /* prompt quality: strength meter + hints */
+  .quality{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:12px 14px;margin-bottom:12px}
+  .q-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .q-title{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+  .q-meter{display:inline-flex;gap:3px}
+  .q-meter i{width:22px;height:6px;border-radius:2px;background:var(--line)}
+  .quality[data-level="0"] .q-meter i:nth-child(-n+1){background:#C2410C}
+  .quality[data-level="1"] .q-meter i:nth-child(-n+2){background:#C88A04}
+  .quality[data-level="2"] .q-meter i:nth-child(-n+3){background:var(--ok)}
+  .quality[data-level="3"] .q-meter i{background:var(--ok)}
+  .q-level{font-size:12.5px;font-weight:700}
+  .q-ok{font-size:12.5px;color:var(--ok);margin:8px 0 0}
+  .q-list{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+  .q-more{margin-top:8px}
+
+  .hint{display:flex;gap:9px;align-items:flex-start;font-size:12.5px;line-height:1.45;color:var(--ink)}
+  .hint .h-dot{flex:none;width:7px;height:7px;border-radius:50%;margin-top:6px;background:var(--faint)}
+  .hint.sev-risk .h-dot{background:#B4351F}
+  .hint.sev-conflict .h-dot{background:#C2410C}
+  .hint.sev-warn .h-dot{background:#C88A04}
+  .hint.sev-miss .h-dot{background:var(--line-strong)}
+  .hint.sev-tip .h-dot{background:var(--accent)}
+  .hint .h-body{flex:1;min-width:0}
+  .hint .h-field{font:inherit;font-weight:700;color:var(--accent-ink);background:none;border:0;padding:0;cursor:pointer}
+  .hint .h-field:hover{text-decoration:underline}
+  .hint .h-acts{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
+  .hint .h-acts button{font-family:var(--sans);font-size:11.5px;color:var(--accent-ink);background:var(--accent-tint);
+    border:1px solid transparent;border-radius:20px;padding:2px 9px;cursor:pointer}
+  .hint .h-acts button:hover{border-color:var(--accent)}
+  .hint .h-x{flex:none;border:0;background:none;color:var(--faint);cursor:pointer;font-size:15px;line-height:1;padding:2px 3px}
+  .hint .h-x:hover{color:var(--ink)}
+  .block .bh{margin-top:9px;display:flex;flex-direction:column;gap:7px}
+  .block .bh .hint{font-size:12px;color:var(--muted)}
+  .block .bh .hint.sev-risk,.block .bh .hint.sev-conflict,.block .bh .hint.sev-warn{color:var(--ink)}
 
   @media (max-width:880px){
     .app{padding:0 18px}
@@ -249,6 +286,16 @@
       </div>
       <p class="fmt-hint" id="fmtHint"></p>
       <div class="aspect-bar" id="aspectBar" style="display:none"></div>
+      <div class="quality" id="quality" hidden>
+        <div class="q-head">
+          <span class="q-title" id="qTitle"></span>
+          <span class="q-meter" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+          <span class="q-level" id="qLevel"></span>
+        </div>
+        <p class="q-ok" id="qOk" hidden></p>
+        <ul class="q-list" id="qList"></ul>
+        <button type="button" class="link q-more" id="qMore" hidden></button>
+      </div>
       <div class="output">
         <pre id="out" class="empty" aria-live="polite"></pre>
         <div class="output-foot">
@@ -506,7 +553,7 @@
         F("constraints","constraints","md",
           {ru:"Ограничения",en:"Constraints",cs:"Omezení"},
           {ru:"Чего избегать, правила, границы.",en:"What to avoid, rules, boundaries.",cs:"Čemu se vyhnout, pravidla, hranice."},
-          {ru:"Без канцелярита и восклицательных знаков. Не придумывать функции, которых нет.",en:"No corporate jargon or exclamation marks. Don't invent features that don't exist.",cs:"Bez úředničiny a vykřičníků. Nevymýšlej funkce, které neexistují."}),
+          {ru:"Пиши простыми словами, потому что тексты читают на бегу. Упоминай только существующие функции.",en:"Use plain words, because people read on the go. Only mention features that exist.",cs:"Piš jednoduchými slovy, protože texty se čtou za pochodu. Zmiňuj jen existující funkce."}),
         F("tone","tone","sm",
           {ru:"Тон и стиль",en:"Tone & style",cs:"Tón a styl"},
           {ru:"Как должно звучать.",en:"How it should sound.",cs:"Jak to má znít."},
@@ -575,7 +622,7 @@
         F("params","params","sm",
           {ru:"Параметры",en:"Parameters",cs:"Parametry"},
           {ru:"Флаги / настройки модели.",en:"Model flags / settings.",cs:"Přepínače / nastavení modelu."},
-          {ru:"--v 6 --style raw",en:"--v 6 --style raw",cs:"--v 6 --style raw"},{special:true})
+          {ru:"seed 1234, 4 варианта",en:"seed 1234, 4 variations",cs:"seed 1234, 4 varianty"},{special:true})
       ]
     },
 
@@ -675,8 +722,8 @@
   var STRUCT={aspect:{ru:"КАДР",en:"ASPECT",cs:"POMĚR"},params:{ru:"ПАРАМЕТРЫ",en:"PARAMETERS",cs:"PARAMETRY"}};
 
   var L = {
-    cs:{mark:"offline · 3 režimy",title:"Konstruktor promptů",
-      sub:"Skládej prompty pro text, obrázky a video z hotových částí.",
+    cs:{mark:"offline · 4 režimy",title:"Konstruktor promptů",
+      sub:"Skládej prompty pro text, obrázky, video a kód z hotových částí.",
       components:"Součásti",fillWord:"bloků",clearAll:"Vymazat vše",prompt:"Prompt",
       empty:"Vyplň bloky vlevo — tady se objeví hotový prompt.",
       save:"Do historie",saved:"Uloženo ✓",download:"Stáhnout .txt",copy:"Kopírovat",copied:"Zkopírováno ✓",
@@ -689,8 +736,8 @@
       fmtNames:{md:"Markdown",xml:"XML značky",plain:"Prostý text",prose:"Próza",tags:"Tagy",midjourney:"Midjourney",structured:"Struktura"},
       countFn:function(c,w){return c+" znaků · "+w+" slov";},
       fmtNoteFn:function(x){return "Formát: "+x;}},
-    ru:{mark:"офлайн · 3 режима",title:"Конструктор промптов",
-      sub:"Собирай промпты для текста, изображений и видео из готовых составляющих.",
+    ru:{mark:"офлайн · 4 режима",title:"Конструктор промптов",
+      sub:"Собирай промпты для текста, изображений, видео и кода из готовых составляющих.",
       components:"Составляющие",fillWord:"блоков",clearAll:"Очистить всё",prompt:"Промпт",
       empty:"Заполни блоки слева — здесь появится готовый промпт.",
       save:"В историю",saved:"Сохранено ✓",download:"Скачать .txt",copy:"Копировать",copied:"Скопировано ✓",
@@ -703,15 +750,15 @@
       fmtNames:{md:"Markdown",xml:"XML-теги",plain:"Простой текст",prose:"Проза",tags:"Теги",midjourney:"Midjourney",structured:"Структура"},
       countFn:function(c,w){return c+" симв · "+w+" слов";},
       fmtNoteFn:function(x){return "Формат: "+x;}},
-    en:{mark:"offline · 3 modes",title:"Prompt Constructor",
-      sub:"Build prompts for text, images and video from ready-made parts.",
+    en:{mark:"offline · 4 modes",title:"Prompt Constructor",
+      sub:"Build prompts for text, images, video and code from ready-made parts.",
       components:"Components",fillWord:"blocks",clearAll:"Clear all",prompt:"Prompt",
       empty:"Fill the blocks on the left — your prompt appears here.",
       save:"Save",saved:"Saved ✓",download:"Download .txt",copy:"Copy",copied:"Copied ✓",
       hist:"History",histTitle:"Prompt history",
       histEmpty:"Empty for now.\nClick “Save” to store the current prompt.",
       restore:"Restore",del:"Delete",clearHist:"Clear history",
-      footL:"One file. Nothing leaves the network — everything is stored locally in the browser.",
+      footL:"One file. Nothing is sent over the network — everything is stored locally in the browser.",
       confirmClear:"Clear all blocks on this tab?",confirmClearHist:"Clear the entire history?",
       untitled:"Untitled",clearSure:"Sure?",loc:"en-US",aspectLbl:"frame",
       fmtNames:{md:"Markdown",xml:"XML tags",plain:"Plain text",prose:"Prose",tags:"Tags",midjourney:"Midjourney",structured:"Structured"},
@@ -735,9 +782,9 @@
 
   var DRAFT_KEY="prompt-constructor-draft-v3", HIST_KEY="prompt-constructor-history-v3";
   var lang="cs", mode="text";
-  var states={}, fmts={}, aspects={};
+  var states={}, fmts={}, aspects={}, dismissed={};
   Object.keys(MODES).forEach(function(m){
-    states[m]={}; MODES[m].fields.forEach(function(f){ states[m][f.id]=""; });
+    states[m]={}; dismissed[m]={}; MODES[m].fields.forEach(function(f){ states[m][f.id]=""; });
     fmts[m]=MODES[m].defFmt; aspects[m]=MODES[m].aspect?MODES[m].aspect.def:null;
   });
   var history=[];
@@ -749,11 +796,12 @@
       if(d.states[m])MODES[m].fields.forEach(function(f){ states[m][f.id]=d.states[m][f.id]||""; });});
     if(d.fmts)Object.keys(fmts).forEach(function(m){ if(d.fmts[m])fmts[m]=d.fmts[m]; });
     if(d.aspects)Object.keys(aspects).forEach(function(m){ if(d.aspects[m]!==undefined)aspects[m]=d.aspects[m]; });
+    if(d.dismissed)Object.keys(dismissed).forEach(function(m){ if(d.dismissed[m])dismissed[m]=d.dismissed[m]; });
   }catch(e){}
   try{ var h=JSON.parse(localStorage.getItem(HIST_KEY)||"[]"); if(Array.isArray(h))history=h; }catch(e){}
 
   function persistDraft(){ try{ localStorage.setItem(DRAFT_KEY,JSON.stringify(
-    {lang:lang,mode:mode,states:states,fmts:fmts,aspects:aspects})); }catch(e){} }
+    {lang:lang,mode:mode,states:states,fmts:fmts,aspects:aspects,dismissed:dismissed})); }catch(e){} }
   function persistHistory(){ try{ localStorage.setItem(HIST_KEY,JSON.stringify(history)); }catch(e){} }
 
   var T=function(){ return L[lang]; };
@@ -777,6 +825,33 @@
 
   function nonEmpty(ids){ return ids.map(function(id){ return (st()[id]||"").trim(); })
     .filter(function(v){ return v.length>0; }); }
+
+  /* Язык содержимого (не интерфейса): от него зависят связки в прозе.
+     Английские связки к чешскому или русскому тексту давали мешанину вида «kočka in útulný pokoj». */
+  var CYR=/[Ѐ-ӿ]/, CZ=/[ěščřžůťďňĚŠČŘŽŮŤĎŇ]/, CZSOFT=/[áéíóúýÁÉÍÓÚÝ]/;
+  function contentLang(m){
+    var txt=MODES[m||mode].fields.filter(function(f){ return f.id!=="params"&&!f.code; })
+      .map(function(f){ return states[m||mode][f.id]||""; }).join(" ");
+    if(CYR.test(txt)) return "ru";
+    if(CZ.test(txt)||(CZSOFT.test(txt)&&lang==="cs")) return "cs";
+    return "en";
+  }
+  var PROSE_X={
+    aspect:{cs:"Poměr stran",ru:"Соотношение сторон",en:"Aspect ratio"},
+    params:{cs:"Parametry",ru:"Параметры",en:"Parameters"},
+    avoid:{cs:"Vyhnout se",ru:"Избегать",en:"Avoid"},
+    scene:{cs:"Scéna",ru:"Сцена",en:"A scene"}
+  };
+  function endDot(s){ return /[.!?…]$/.test(s)?s:s+"."; }
+  /* Проза с метками для cs/ru: «Subjekt, akce. Prostředí: …. Světlo: ….» — без склонений, но и без чужих связок */
+  function labeledProse(m,ids,cl){
+    var byId={}; MODES[m].fields.forEach(function(fl){ byId[fl.id]=fl; });
+    var g=function(id){ return (states[m][id]||"").trim(); };
+    var open=[g("subject"),g("action")].filter(Boolean).join(", ");
+    var parts=[]; if(open) parts.push(endDot(cap(open)));
+    ids.forEach(function(id){ var v=g(id); if(v) parts.push(byId[id].label[cl]+": "+endDot(v)); });
+    return tidy(parts.join(" "));
+  }
 
   function composeText(){
     var flds=MODES.text.fields.filter(function(f){ return st()[f.id].trim(); });
@@ -818,20 +893,25 @@
       if(neg) sl.push(byId.negative.label[lang]+": "+neg);
       return sl.join("\n");
     }
-    // prose — woven into sentences with natural connectors
-    var open=g("subject");
-    var act=g("action"); if(act) open=open?open+", "+act:act;
-    var env=g("environment"); if(env) open=open?open+" in "+env:"A scene in "+env;
-    var det=[];
-    var comp=g("composition"); if(comp) det.push(comp);
-    var light=g("lighting"); if(light) det.push("lit with "+light);
-    var cam=g("camera"); if(cam) det.push("shot on "+cam);
-    var sty=g("style"); if(sty) det.push("in a "+sty+" style");
-    var pal=g("palette"); if(pal) det.push("with a "+pal+" palette");
-    var ref=g("references"); if(ref) det.push("referencing "+ref);
-    var body=tidy([open?cap(open)+".":"", det.length?cap(det.join(", "))+".":""].filter(Boolean).join(" "));
+    var cl=contentLang("image"), body;
+    if(cl!=="en"){
+      body=labeledProse("image",["environment","composition","lighting","camera","style","palette","references"],cl);
+    } else {
+      // prose — woven into sentences with natural connectors
+      var open=g("subject");
+      var act=g("action"); if(act) open=open?open+", "+act:act;
+      var env=g("environment"); if(env) open=open?open+" in "+env:"A scene in "+env;
+      var det=[];
+      var comp=g("composition"); if(comp) det.push(comp);
+      var light=g("lighting"); if(light) det.push("lit with "+light);
+      var cam=g("camera"); if(cam) det.push("shot on "+cam);
+      var sty=g("style"); if(sty) det.push("in a "+sty+" style");
+      var pal=g("palette"); if(pal) det.push("with a "+pal+" palette");
+      var ref=g("references"); if(ref) det.push("referencing "+ref);
+      body=tidy([open?cap(open)+".":"", det.length?cap(det.join(", "))+".":""].filter(Boolean).join(" "));
+    }
     var extra=[];
-    if(arOn)extra.push("Aspect ratio: "+ar); if(params)extra.push("Parameters: "+params); if(neg)extra.push("Avoid: "+neg);
+    if(arOn)extra.push(PROSE_X.aspect[cl]+": "+ar); if(params)extra.push(PROSE_X.params[cl]+": "+params); if(neg)extra.push(PROSE_X.avoid[cl]+": "+neg);
     return body+(extra.length?(body?"\n\n":"")+extra.join("\n"):"");
   }
 
@@ -841,7 +921,7 @@
     var g=function(id){ return (st()[id]||"").trim(); };
     if(f==="structured"){
       var flds=MODES.video.fields.filter(function(fl){ return fl.id!=="params"&&st()[fl.id].trim(); });
-      if(!flds.length&&!params&&!arOn) return "";
+      if(!flds.length&&!params) return "";
       var parts=flds.map(function(fl){ return fl.label[lang].toUpperCase()+":\n"+st()[fl.id].trim(); });
       if(arOn)parts.push(STRUCT.aspect[lang]+":\n"+ar);
       if(params)parts.push(STRUCT.params[lang]+":\n"+params);
@@ -849,20 +929,25 @@
     }
     var any=MODES.video.fields.some(function(fl){ return fl.id!=="params"&&st()[fl.id].trim(); })||params;
     if(!any) return "";
-    // prose — subject sentence, motion/look sentence, then the scene arc
-    var open=g("subject");
-    var act=g("action"); if(act) open=open?open+", "+act:act;
-    var env=g("environment"); if(env) open=open?open+" in "+env:"A scene in "+env;
-    var det=[];
-    var comp=g("composition"); if(comp) det.push(comp);
-    var cm=g("camera_move"); if(cm) det.push("camera "+cm);
-    var light=g("lighting"); if(light) det.push("lit with "+light);
-    var sty=g("style"); if(sty) det.push("in a "+sty+" style");
-    var mood=g("mood"); if(mood) det.push(mood+" mood");
-    var dyn=g("dynamics"); if(dyn) det.push(dyn);
-    var s3=arc?cap(arc)+(/[.!?]$/.test(arc)?"":"."):"";
-    var body=tidy([open?cap(open)+".":"", det.length?cap(det.join(", "))+".":"", s3].filter(Boolean).join(" "));
-    var extra=[]; if(arOn)extra.push("Aspect ratio: "+ar); if(params)extra.push("Parameters: "+params);
+    var cl=contentLang("video"), body;
+    if(cl!=="en"){
+      body=labeledProse("video",["environment","camera_move","composition","lighting","style","mood","dynamics","arc"],cl);
+    } else {
+      // prose — subject sentence, motion/look sentence, then the scene arc
+      var open=g("subject");
+      var act=g("action"); if(act) open=open?open+", "+act:act;
+      var env=g("environment"); if(env) open=open?open+" in "+env:"A scene in "+env;
+      var det=[];
+      var comp=g("composition"); if(comp) det.push(comp);
+      var cm=g("camera_move"); if(cm) det.push("camera "+cm);
+      var light=g("lighting"); if(light) det.push("lit with "+light);
+      var sty=g("style"); if(sty) det.push("in a "+sty+" style");
+      var mood=g("mood"); if(mood) det.push(mood+" mood");
+      var dyn=g("dynamics"); if(dyn) det.push(dyn);
+      var s3=arc?cap(arc)+(/[.!?]$/.test(arc)?"":"."):"";
+      body=tidy([open?cap(open)+".":"", det.length?cap(det.join(", "))+".":"", s3].filter(Boolean).join(" "));
+    }
+    var extra=[]; if(arOn)extra.push(PROSE_X.aspect[cl]+": "+ar); if(params)extra.push(PROSE_X.params[cl]+": "+params);
     return body+(extra.length?(body?"\n\n":"")+extra.join("\n"):"");
   }
 
@@ -880,6 +965,612 @@
   }
 
   function compose(){ return mode==="text"?composeText():mode==="image"?composeImage():mode==="video"?composeVideo():composeCode(); }
+
+  /* ================= ПОДСКАЗКИ =================
+     Правила без LLM. Каждое правило смотрит на блоки и возвращает подсказки
+     {id, sev, field, text, acts}. sev: risk > conflict > warn > miss > tip. */
+
+  var SEV_ORDER={risk:0,conflict:1,warn:2,miss:3,tip:4};
+  var focusedField=null, hintsOpen=false, hintTimer=null;
+
+  function esc(s){ return s.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"); }
+  function lc(s){ return s.toLowerCase(); }
+  function fill(s,map){ return s.replace(/\{(\w+)\}/g,function(_,k){ return map[k]!=null?map[k]:""; }); }
+  function qt(s){ return lang==="en"?"“"+s+"”":lang==="cs"?"„"+s+"“":"«"+s+"»"; }
+  function qlist(arr){ return arr.slice(0,3).map(qt).join(", "); }
+  function wordsN(s){ return (String(s).trim().match(/[\p{L}\p{N}][\p{L}\p{N}'’\-\/.]*/gu)||[]).length; }
+  var WB="(?:^|[^\\p{L}\\p{N}])", WE="(?![\\p{L}\\p{N}])";
+  function rx(alts){ return new RegExp(WB+"("+alts.join("|")+")"+WE,"giu"); }
+  function findAll(re,text){
+    var out=[], m; re.lastIndex=0;
+    while((m=re.exec(text))){
+      var w=m[1].trim(); if(w&&out.map(lc).indexOf(lc(w))<0) out.push(w);
+      if(re.lastIndex===m.index) re.lastIndex++;
+    }
+    return out;
+  }
+  function firstMatch(re,text){ var m=String(text).match(re); return m?m[0].trim():""; }
+  function cleanList(v){
+    return v.replace(/[ \t]+/g," ").replace(/ +([,.;])/g,"$1").replace(/([,;])\s*(?=[,;.]|$)/g,"")
+      .replace(/^[\s,;.]+/,"").replace(/[\s,;]+$/,"").replace(/,(?=\S)/g,", ");
+  }
+  function fieldDef(id){ return MODES[mode].fields.find(function(f){ return f.id===id; }); }
+  function fieldLabel(id){ var f=fieldDef(id); return f?f.label[lang]:id; }
+
+  /* ---------- словари ---------- */
+  var RX_VAGUE=rx([
+    "красив\\p{L}*","красот\\p{L}*","прекрасн\\p{L}*","хорош\\p{L}*","классн\\p{L}*","интересн\\p{L}*",
+    "крут(?:ой|ая|ое|ые|ого|ую|о)","необычн\\p{L}*","стильн\\p{L}*","качественн\\p{L}*","эпичн\\p{L}*",
+    "потрясающ\\p{L}*","шикарн\\p{L}*","офигенн\\p{L}*","атмосферн\\p{L}*",
+    "krásn\\p{L}*","hezk\\p{L}*","pěkn\\p{L}*","dobr(?:ý|á|é|ou|ém|ého|ých)","zajímav\\p{L}*","skvěl\\p{L}*",
+    "úžasn\\p{L}*","parádn\\p{L}*","kvalitn\\p{L}*","stylov\\p{L}*","atmosférick\\p{L}*",
+    "nice","beautiful","pretty","good","awesome","amazing","epic","stunning","great","interesting",
+    "perfect","gorgeous","stylish","atmospheric","super",
+    "cool(?!\\s+(?:tones?|colou?rs?|light|palette|blue|white|grey|gray|shades?|temperature))"
+  ]);
+  var RX_BOOST=rx([
+    "masterpiece","best quality","high(?:est)? quality","ultra[- ]?detailed","highly detailed","hyper[- ]?detailed",
+    "extremely detailed","(?:4|8|16)k","uhd","trending on artstation","award[- ]winning","ultra[- ]?realistic",
+    "шедевр\\p{L}*","высок\\p{L}* качеств\\p{L}*","максимальн\\p{L}* качеств\\p{L}*","(?:ультра|супер|гипер)[- ]?детализ\\p{L}*","(?:4|8)к",
+    "mistrovsk\\p{L}* díl\\p{L}*","vysok\\p{L}* kvalit\\p{L}*","(?:ultra|super|hyper)[- ]?detailn\\p{L}*"
+  ]);
+  var NEG_WORDS="без|bez|without|no|никаких|нет|žádn\\p{L}*";
+  function rxNegPhrase(){ return new RegExp(WB+"("+NEG_WORDS+")\\s+([^,.;:\\n]+)","giu"); }
+  function rxNegWord(){ return new RegExp(WB+"(без|bez|without|no|not|never|никаких|нет|не|ne|žádn\\p{L}*)(?=\\s)","giu"); }
+  var RX_SECRET=/(sk-[A-Za-z0-9_-]{16,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,}|xox[baprs]-[A-Za-z0-9-]{10,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|(?:api[_-]?key|secret|password|passwd|token)\s*[:=]\s*['"]?[^\s'"]{8,})/i;
+  var RX_PLACEHOLDER=/(\bTODO\b|\bTBD\b|\bXXX\b|\?\?\?|lorem ipsum|\[(?:вставить|вставь|сюда|insert|here|vložit|sem|zde)[^\]]*\])/i;
+
+  /* понятия для поиска противоречий (чипы + русские и чешские синонимы) */
+  var C={
+    golden:/golden hour|золот\p{L}* час|zlat\p{L}* hodin/iu,
+    blue:/blue hour|син\p{L}* час|modr\p{L}* hodin/iu,
+    highkey:/high[- ]key/i, lowkey:/low[- ]key/i,
+    hard:/hard light|ж[её]стк\p{L}* свет|tvrd\p{L}* světl/iu,
+    soft:/soft (?:diffused )?light|мягк\p{L}* свет|měkk\p{L}* světl/iu,
+    mono:/monochrome|black and white|b&w|монохром|ч[её]рно-?бел|černobíl/iu,
+    colorful:/neon palette|teal and orange|warm tones|cool tones|earth tones|muted pastels|т[её]пл\p{L}* тон|холодн\p{L}* тон|tepl\p{L}* tón|studen\p{L}* tón/iu,
+    warm:/warm tones|т[её]пл\p{L}* (?:тон|цвет|палитр)|tepl\p{L}* (?:tón|barv)/iu,
+    cool:/cool tones|холодн\p{L}* (?:тон|цвет|палитр)|studen\p{L}* (?:tón|barv)/iu,
+    photo:/photo-?realis\p{L}*|photoreal\p{L}*|фотореал\p{L}*|fotoreal\p{L}*/iu,
+    illus:/anime|аниме|watercolou?r|акварел\p{L}*|akvarel\p{L}*|oil painting|маслом|olejomalb\p{L}*|line art|cartoon|мульт\p{L}*|kreslen\p{L}*|комикс\p{L}*|comic|pixel art|пиксел\p{L}*/iu,
+    close:/extreme close-up|close-?up|macro|крупн\p{L}* план|макро|detailní záběr|makro/iu,
+    wide:/wide shot|full body|общ\p{L}* план|полный рост|celek|celá postava/iu,
+    low:/low angle|нижн\p{L}* ракурс|снизу|podhled/iu,
+    high:/high angle|overhead|top-down|верхн\p{L}* ракурс|сверху|nadhled|shora/iu,
+    centered:/centered|symmetrical|по центру|симметри\p{L}*|uprostřed|symetri\p{L}*/iu,
+    thirds:/rule of thirds|правил\p{L}* трет\p{L}*|pravidl\p{L}* třetin/iu,
+    wideLens:/wide-angle|широкоугол\p{L}*|širokoúhl\p{L}*|(?:^|\D)(?:14|16|18|20|24)\s?mm/iu,
+    tele:/telephoto|телевик|teleobjektiv|(?:^|\D)(?:85|105|135|200)\s?mm/iu,
+    lens:/\d{2,3}\s?mm|f\/\d|bokeh|depth of field|ГРИП|hloubk\p{L}* ostrosti/iu,
+    staticCam:/static shot|static camera|статичн\p{L}* (?:камер|кадр|план)\p{L}*|statick\p{L}* (?:kamer|záběr)\p{L}*/iu,
+    moveCam:/push-in|pull-out|pan (?:left|right)|tilt (?:up|down)|tracking shot|dolly|crane shot|handheld|orbit|drone|FPV|наезд|отъезд|облёт|облет|проезд|трекинг|nájezd|odjezd|švenk|oblet/iu,
+    slowmo:/slow[- ]?motion|замедлен\p{L}*|zpomal\p{L}*/iu,
+    fast:/time-?lapse|hyperlapse|fast-paced|таймлапс|ускорен\p{L}*|zrychlen\p{L}*|timelapse/iu,
+    realtime:/real-?time|реальн\p{L}* скорост\p{L}*|reáln\p{L}* rychlost\p{L}*/iu,
+    vertical:/portrait|full body|в полный рост|портрет\p{L}*|portrét\p{L}*|celá postava|vertical|вертикал\p{L}*|svisl\p{L}*/iu,
+    horizontal:/landscape|panoram\p{L}*|wide shot|пейзаж\p{L}*|панорам\p{L}*|krajin\p{L}*|celek/iu
+  };
+  var CONFLICTS=[
+    {a:"golden",b:"blue",k:"time"},{a:"highkey",b:"lowkey",k:"key"},{a:"hard",b:"soft",k:"light"},
+    {a:"mono",b:"colorful",k:"mono"},{a:"warm",b:"cool",k:"temp"},{a:"photo",b:"illus",k:"medium"},
+    {a:"close",b:"wide",k:"size"},{a:"low",b:"high",k:"angle"},{a:"centered",b:"thirds",k:"center"},
+    {a:"wideLens",b:"tele",k:"lens"},
+    {a:"staticCam",b:"moveCam",k:"static",modes:["video"]},
+    {a:"slowmo",b:"fast",k:"speed",modes:["video"]},{a:"realtime",b:"slowmo",k:"speed",modes:["video"]}
+  ];
+
+  /* что считается основой промпта в каждом режиме */
+  var COVER={
+    text:{crit:["task"],rec:["context","format","role"],nice:["constraints","audience","tone","examples"]},
+    image:{crit:["subject"],rec:["composition","lighting","style"],nice:["environment","camera","palette"]},
+    video:{crit:["subject"],rec:["action","camera_move","lighting","style"],nice:["environment","composition","mood","dynamics"]},
+    code:{crit:["task","stack"],rec:["testing","response","constraints"],nice:["contract"]}
+  };
+  /* описательные блоки, где ищем размытые слова и противоречия */
+  var DESC={
+    text:["task","context","format","constraints"],
+    image:["subject","action","environment","composition","lighting","camera","style","palette","references"],
+    video:["subject","action","environment","camera_move","composition","lighting","style","mood","dynamics","arc"],
+    code:["task","constraints","contract"]
+  };
+
+  /* ---------- тексты (cs / ru / en) ---------- */
+  function H(cs,ru,en){ return {cs:cs,ru:ru,en:en}; }
+  var M={
+    title:H("Síla promptu","Сила промпта","Prompt strength"),
+    levels:{cs:["Slabý","Základní","Dobrý","Silný"],ru:["Слабый","Базовый","Хороший","Сильный"],en:["Weak","Basic","Good","Strong"]},
+    ok:H("Žádné zjevné problémy.","Явных проблем нет.","No obvious issues."),
+    more:H("Zobrazit vše ({n})","Показать все ({n})","Show all ({n})"),
+    less:H("Sbalit","Свернуть","Collapse"),
+    dismiss:H("Skrýt tip","Скрыть подсказку","Dismiss hint"),
+    aGo:H("Přejít","Перейти","Go to block"),
+    aNeg:H("Přesunout do negativu","Перенести в негатив","Move to negative"),
+    aRemove:H("Odstranit","Убрать","Remove"),
+    aStrip:H("Odstranit zápory","Убрать отрицания","Remove negations"),
+    aAspect:H("Nastavit {v}","Поставить {v}","Set {v}"),
+    aAspectOff:H("Vypnout poměr v liště","Убрать соотношение из панели","Clear the frame bar"),
+    aFmt:H("Formát {v}","Формат {v}","Switch to {v}"),
+    aClear:H("Vymazat duplicitu","Удалить дубль","Remove duplicate"),
+    vague:H("{x} modelu nic neřekne. Popiš, v čem přesně: světlo, barva, materiál, emoce.",
+      "{x} ничего не говорит модели. Опиши, в чём именно: свет, цвет, материал, эмоция.",
+      "{x} tells the model nothing. Say what exactly: light, colour, material, emotion."),
+    vagueT:H("{x} je vágní hodnocení. Formuluj kritérium: co přesně má vzniknout (délka, tón, struktura).",
+      "{x} — размытая оценка. Сформулируй критерий: что именно должно получиться (длина, тон, структура).",
+      "{x} is a vague judgement. State the criterion: what exactly should come out (length, tone, structure)."),
+    boost:H("{x} jsou „kouzelná slova“ starých modelů. Flux, Nano Banana, Midjourney 7 i Veo je ignorují nebo obraz přepálí. Lepší je konkrétnost: materiál, světlo, optika.",
+      "{x} — «волшебные слова» старых моделей. Flux, Nano Banana, Midjourney 7 и Veo их игнорируют или пережаривают картинку. Лучше конкретика: материал, свет, оптика.",
+      "{x} are “magic words” from older models. Flux, Nano Banana, Midjourney 7 and Veo ignore them or overcook the image. Be concrete instead: material, light, optics."),
+    negPos:H("{x}: zápor v popisu modely často čtou naopak — vidí slovo a nakreslí ho. Zákaz přesuň do negativu, vlastnost popiš kladně („bez rukávů“ → „sleeveless“).",
+      "{x}: отрицание в описании модели часто читают наоборот — видят слово и рисуют его. Запрет перенеси в негатив, а признак опиши позитивно («без рукавов» → «sleeveless»).",
+      "{x}: models often read negations backwards — they see the word and draw it. Move bans to the negative prompt and describe traits positively (“no sleeves” → “sleeveless”)."),
+    negPosV:H("{x}: video modely zápory chápou špatně a zmíněné často přidají. Popiš, co v záběru je: ne „bez lidí“, ale „prázdná ulice“.",
+      "{x}: видео-модели плохо понимают отрицания и часто добавляют упомянутое. Опиши, что в кадре есть: не «без людей», а «пустая улица».",
+      "{x}: video models handle negations poorly and often add what you mention. Describe what is there: not “no people” but “an empty street”."),
+    negField:H("V negativu vyjmenuj samotné objekty: „text, vodoznak“, ne „bez textu“. Slova „bez“ a „no“ jsou tam navíc a někdy škodí.",
+      "В негативе перечисляй сами объекты: «текст, водяной знак», а не «без текста». Слова «без» и «no» там лишние и иногда мешают.",
+      "In the negative prompt list the things themselves: “text, watermark”, not “no text”. Words like “no” are redundant there and can backfire."),
+    conflict:H("Rozpor: {a} ↔ {b}. {why}","Противоречие: {a} ↔ {b}. {why}","Conflict: {a} ↔ {b}. {why}"),
+    k:{
+      time:H("Jde o jinou denní dobu: teplé nízké slunce proti studenému soumraku. Vyber jedno.","Это разное время суток: тёплое низкое солнце против холодных сумерек. Выбери одно.","These are different times of day: warm low sun versus cold dusk. Pick one."),
+      key:H("High-key je světlé a skoro bez stínů, low-key tmavé a kontrastní. Jsou to protiklady.","High-key — светло и почти без теней, low-key — темно и контрастно. Это противоположности.","High-key is bright with few shadows, low-key is dark and contrasty. They're opposites."),
+      light:H("Hlavní světlo je buď tvrdé, nebo měkké. Chceš-li obojí, rozděl je: „měkké vyplňující, tvrdé protisvětlo“.","Основной свет либо жёсткий, либо мягкий. Если нужно оба — разведи: «мягкий заполняющий, жёсткий контровой».","The key light is either hard or soft. If you want both, split them: “soft fill, hard rim light”."),
+      mono:H("Monochrom a barevná paleta se vylučují.","Монохром и цветная палитра исключают друг друга.","Monochrome and a colour palette cancel each other out."),
+      temp:H("Teplé a studené tóny spolu fungují jen jako záměrný kontrast — pak to tak napiš: „teplé světlo, studené stíny“.","Тёплые и холодные тона вместе работают только как задуманный контраст — тогда так и напиши: «тёплый свет, холодные тени».","Warm and cool tones only work together as a deliberate contrast — then say so: “warm light, cool shadows”."),
+      medium:H("Fotorealismus a ilustrace táhnou obraz opačným směrem. Chceš-li mix, pojmenuj ho, např. „semi-realistic anime“.","Фотореализм и иллюстрация тянут картинку в разные стороны. Если нужен микс — назови его явно, например «semi-realistic anime».","Photorealism and illustration pull the image in opposite directions. If you want a blend, name it, e.g. “semi-realistic anime”."),
+      size:H("Detail a celek v jednom záběru si odporují. Jde-li o přechod ve videu, popiš ho ve „Vývoji scény“.","Крупный и общий план в одном кадре противоречат. Если это переход в видео — опиши его в «Развитии сцены».","A close-up and a wide shot in one frame contradict each other. If it's a transition in video, describe it in “Scene arc”."),
+      angle:H("Podhled a nadhled zároveň nejdou.","Нижний и верхний ракурс одновременно невозможны.","A low and a high angle can't happen at once."),
+      center:H("Střed a symetrie proti pravidlu třetin jsou různé kompozice.","Центр и симметрия против правила третей — это разные композиции.","Centred or symmetrical versus rule of thirds are different compositions."),
+      lens:H("Širokoúhlý objektiv a teleobjektiv dávají opačnou perspektivu.","Широкоугольник и телевик дают противоположную перспективу.","Wide-angle and telephoto give opposite perspective."),
+      "static":H("Statická kamera a pohyb kamery se vylučují.","Статичная камера и движение камеры исключают друг друга.","A static camera and a camera move rule each other out."),
+      speed:H("To jsou opačné rychlosti času v jednom klipu.","Это противоположная скорость времени в одном клипе.","These are opposite speeds of time in one clip.")
+    },
+    aspectV:H("{x} v poměru {ar}: po stranách zůstane prázdno a postava bude malá. Svislým motivům sedí {to}.",
+      "{x} в кадре {ar}: по бокам останется пустота, а фигура будет мелкой. Вертикальным сюжетам подходит {to}.",
+      "{x} in a {ar} frame leaves empty sides and a small figure. Vertical subjects suit {to}."),
+    aspectH:H("{x} ve svislém poměru {ar} ztrácí prostor. Širokým scénám sedí {to}.",
+      "{x} в вертикальном кадре {ar} теряет простор. Широким сценам подходит {to}.",
+      "{x} loses its breadth in a vertical {ar} frame. Wide scenes suit {to}."),
+    lensIllus:H("Optika ({x}) na ilustraci ({y}) skoro nemá vliv — jsou to fotografické pojmy. Popiš raději kompozici a kresebný styl.",
+      "Оптика ({x}) почти не влияет на иллюстрацию ({y}) — это термины фотографии. Лучше опиши композицию и манеру рисунка.",
+      "Lens terms ({x}) barely affect an illustration ({y}) — they're photography terms. Describe composition and drawing style instead."),
+    textInImage:H("V obraze má být text {x}. Napiš, kde stojí a jakým písmem („velký ručně psaný nadpis nahoře“). Text nejlépe zvládají Nano Banana, Ideogram a GPT-image; Midjourney a SDXL v písmenech často chybují.",
+      "В кадре нужен текст {x}. Укажи, где он стоит и каким шрифтом («крупный рукописный заголовок сверху»). Текст лучше всего рисуют Nano Banana, Ideogram и GPT-image; Midjourney и SDXL часто ошибаются в буквах.",
+      "The image needs the text {x}. Say where it sits and in what lettering (“large hand-written headline at the top”). Nano Banana, Ideogram and GPT-image render text best; Midjourney and SDXL often garble letters."),
+    mjFlags:H("Přepínače jako {x} chápe jen Midjourney. Ve formátu „{f}“ skončí v promptu jako obyčejný text.",
+      "Флаги вида {x} понимает только Midjourney. В формате «{f}» они попадут в промпт как обычный текст.",
+      "Flags like {x} only work in Midjourney. In the “{f}” format they end up in the prompt as plain text."),
+    arDup:H("Poměr stran je zadán dvakrát: v liště ({ar}) i přepínačem --ar v parametrech. Nech jedno.",
+      "Соотношение сторон задано дважды: в панели кадра ({ar}) и флагом --ar в параметрах. Оставь одно.",
+      "The aspect ratio is set twice: in the frame bar ({ar}) and with --ar in parameters. Keep one."),
+    noDup:H("Zákazy jsou zadané dvakrát: v negativu i přepínačem --no. Negativ se na --no převádí sám, přepínač je navíc.",
+      "Запреты заданы дважды: в негативе и флагом --no. Негатив и так превращается в --no — флаг лишний.",
+      "Exclusions are set twice: in the negative prompt and with --no. The negative already becomes --no, so the flag is redundant."),
+    tagsLong:H("Formát „Tagy“ funguje nejlépe s krátkými frázemi (2–4 slova). Tenhle blok je psaný větou — rozděl ho čárkami.",
+      "Формат «Теги» лучше всего работает с короткими фразами (2–4 слова). Этот блок написан предложением — разбей его запятыми.",
+      "The Tags format works best with short phrases (2–4 words). This block is written as a sentence — split it with commas."),
+    proseLong:H("Prompt je dlouhý ({n} slov). Modely nejvíc dbají na začátek — zkontroluj, že hlavní věc je první, a odstraň opakování.",
+      "Промпт длинный ({n} слов). Модели сильнее всего учитывают начало — проверь, что главное стоит первым, и убери повторы.",
+      "The prompt is long ({n} words). Models weigh the beginning most — make sure the key idea comes first and cut repetition."),
+    langName:{cs:H("česky","чешском","Czech"),ru:H("rusky","русском","Russian")},
+    langTip:H("Píšeš {l}. Nano Banana a GPT-image tomu rozumí, ale pojmy světla, optiky a stylu jsou spolehlivější anglicky — čipy vkládají právě anglické. Próza je proto složená s popisky, bez anglických spojek.",
+      "Текст на {l}. Nano Banana и GPT-image его понимают, но термины света, оптики и стиля надёжнее по-английски — чипы как раз вставляют английские. Поэтому проза собрана с метками, без английских связок.",
+      "You're writing in {l}. Nano Banana and GPT-image understand it, but lighting, lens and style terms are more reliable in English — that's why the chips insert English. The prose is therefore built with labels, without English connectors."),
+    langWarn:H("Midjourney a modely SDXL jsou trénované skoro jen anglicky — text psaný {l} pochopí špatně. Pro tento formát piš anglicky nebo používej čipy.",
+      "Midjourney и модели SDXL обучены почти только на английском — текст на {l} они поймут плохо. Для этого формата пиши по-английски или пользуйся чипами.",
+      "Midjourney and SDXL models are trained almost only on English — text in {l} will be poorly understood. For this format write in English or use the chips."),
+    videoMulti:H("Akcí po sobě v jednom klipu: {n}. Za 5–8 sekund model stihne jednu dvě — rozděl scénu do více klipů.",
+      "Действий подряд в одном клипе: {n}. За 5–8 секунд модель успевает одно-два — разбей сцену на несколько клипов.",
+      "Sequential actions in one clip: {n}. In 5–8 seconds a model manages one or two — split the scene into several clips."),
+    videoLong:H("{x} je delší, než většina modelů vygeneruje (obvykle 5–10 s). Dlouhou scénu skládej z více klipů.",
+      "{x} — длиннее, чем генерирует большинство моделей (обычно 5–10 с). Длинную сцену собирай из нескольких клипов.",
+      "{x} is longer than most models generate (usually 5–10 s). Build a long scene from several clips."),
+    camMany:H("Pohybů kamery v jednom klipu: {n} ({x}). Model je smíchá v chaos — nech jeden dva: „pomalý nájezd, pak oblet“.",
+      "Движений камеры за клип: {n} ({x}). Модель смешает их в хаос — оставь одно-два: «медленный наезд, затем облёт».",
+      "Camera moves in one clip: {n} ({x}). They'll blend into chaos — keep one or two: “slow push-in, then orbit”."),
+    roleGeneric:H("Role je příliš obecná. Uveď obor a úroveň: „UX copywriter se zkušeností ve fintechu“, ne jen „expert“.",
+      "Роль слишком общая. Укажи область и уровень: «редактор UX-текстов с опытом в финтехе», а не просто «эксперт».",
+      "The role is too generic. Give the field and level: “UX writer experienced in fintech”, not just “expert”."),
+    negOnly:H("V omezeních jsou samé zákazy. Modely lépe plní, co dělat: „piš krátkými větami“ funguje spolehlivěji než „nepiš dlouze“.",
+      "В ограничениях одни запреты. Модели лучше выполняют то, что делать: «пиши короткими фразами» работает надёжнее, чем «не пиши длинно».",
+      "The constraints are all prohibitions. Models follow what to do better: “use short sentences” works more reliably than “don't write long”."),
+    noWhy:H("Vysvětli, proč pravidla platí (např. „text se bude číst na mobilu“). Model pak pravidlo lépe použije i v nových situacích.",
+      "Объясни, зачем нужны правила (например, «текст будут читать на телефоне»). Зная причину, модель лучше применяет правило в новых случаях.",
+      "Explain why the rules exist (e.g. “it will be read on a phone”). Knowing the reason, the model applies the rule better in new cases."),
+    shout:H("{x}: velká písmena a „DŮLEŽITÉ“ nutí moderní modely to přehánět. Klidně vysvětli, proč na tom záleží — funguje to líp.",
+      "{x}: капс и «ОБЯЗАТЕЛЬНО» заставляют современные модели перестараться. Спокойно объясни, почему это важно, — сработает лучше.",
+      "{x}: caps and “MUST” make modern models overdo it. Calmly explain why it matters — that works better."),
+    lenVague:H("{x} si každý vyloží jinak. Zadej číslem: „do 120 slov“, „3 body“, „jeden řádek“.",
+      "{x} — каждый понимает по-своему. Задай числом: «до 120 слов», «3 пункта», «одна строка».",
+      "{x} means different things to different readers. Use a number: “under 120 words”, “3 bullets”, “one line”."),
+    oneExample:H("Jeden příklad model kopíruje příliš doslova. Dej 2–3 různé — pochopí, co mají společné.",
+      "Один пример модель копирует слишком буквально. Дай 2–3 разных — она уловит общее.",
+      "With one example the model copies it too literally. Give 2–3 different ones so it picks up the pattern."),
+    versions:H("Uveď verze ({x} → např. „React 18“, „Python 3.12“). API se mezi verzemi mění a model může napsat zastaralý kód.",
+      "Укажи версии ({x} → например «React 18», «Python 3.12»). API между версиями меняется, и модель может написать устаревший код.",
+      "Add versions ({x} → e.g. “React 18”, “Python 3.12”). APIs change between versions and the model may write outdated code."),
+    bugNoErr:H("Vypadá to na chybu. Vlož přesný text chyby a kroky, jak ji vyvolat — jinak bude model hádat.",
+      "Похоже, это баг. Вставь точный текст ошибки и шаги, как её получить, — иначе модель будет угадывать.",
+      "This looks like a bug. Paste the exact error message and the steps to reproduce it — otherwise the model will guess."),
+    fixNoCode:H("Úkolem je upravit existující kód, ale blok „{f}“ je prázdný. Vlož kód, jinak model napíše vlastní od nuly.",
+      "Задача — изменить существующий код, но блок «{f}» пуст. Вставь код, иначе модель напишет свой с нуля.",
+      "The task is to change existing code, but “{f}” is empty. Paste the code, or the model will write its own from scratch."),
+    tooBroad:H("{x} je na jeden prompt příliš široké. Popiš první konkrétní funkci: obrazovku, funkci, endpoint.",
+      "{x} — слишком широко для одного промпта. Опиши первую конкретную фичу: экран, функцию, эндпоинт.",
+      "{x} is too broad for one prompt. Describe the first concrete feature: a screen, a function, an endpoint."),
+    qualityVague:H("{x} — co přesně? Rychlost (na jakou hodnotu), paměť, čitelnost, velikost bundlu? Pojmenuj metriku.",
+      "{x} — что именно? Скорость (до какого значения), память, читаемость, размер бандла? Назови метрику.",
+      "{x} — meaning what? Speed (to what value), memory, readability, bundle size? Name the metric."),
+    longCode:H("Kód má {n} řádků. Dlouhá vložka rozmělní úkol — nech jen funkce a soubory, které se ho týkají.",
+      "В коде {n} строк. Длинная вставка размывает задачу — оставь только относящиеся к ней функции и файлы.",
+      "The code is {n} lines long. A long paste blurs the task — keep only the relevant functions and files."),
+    secret:H("Vypadá to jako klíč nebo heslo ({x}). Před odesláním do chatu ho smaž — prompt může skončit v logu a historii.",
+      "Похоже на ключ или пароль ({x}). Удали его перед отправкой в чат — промпт может попасть в логи и историю.",
+      "This looks like a key or password ({x}). Remove it before sending to a chat — prompts can end up in logs and history."),
+    placeholder:H("{x} vypadá jako nevyplněná šablona.","{x} — похоже на незаполненный шаблон.","{x} looks like an unfilled template."),
+    dup:H("Text se opakuje v blocích „{a}“ a „{b}“. Duplicity prompt neposilují, jen ho nafukují.",
+      "Текст повторяется в блоках «{a}» и «{b}». Дубли не усиливают промпт, а раздувают его.",
+      "The same text appears in “{a}” and “{b}”. Duplicates don't strengthen a prompt, they bloat it."),
+    shortSubj:H("Málo detailů. Upřesni: kdo nebo co, jaký, kolik, čím vyniká (barva, materiál, věk, emoce).",
+      "Мало деталей. Уточни: кто или что, какой, сколько, чем выделяется (цвет, материал, возраст, эмоция).",
+      "Too few details. Specify who or what, what kind, how many, what stands out (colour, material, age, emotion)."),
+    shortTask:H("Popiš výsledek: co udělat, s čím a k čemu.","Опиши результат: что сделать, с чем и для чего.","Describe the outcome: what to do, with what, and what for."),
+    longBlock:H("Blok je přetížený ({n} slov). Rozděl detaily do odpovídajících bloků — snáz se kontrolují a mění.",
+      "Блок перегружен ({n} слов). Вынеси детали в профильные блоки — так их легче проверять и менять.",
+      "This block is overloaded ({n} words). Move details into their own blocks — they're easier to check and change."),
+    miss:H("Chybí „{f}“: {why}.","Нет блока «{f}»: {why}.","“{f}” is empty: {why}."),
+    missInline:H("Doporučeno: {why}.","Рекомендуется: {why}.","Recommended: {why}."),
+    why:{
+      image:{
+        composition:H("bez něj si model vybere záběr sám — obvykle nudný střed","без него модель выберет кадр сама — обычно скучный центр","without it the model picks the framing itself — usually a dull centre"),
+        lighting:H("světlo nejvíc určuje náladu","свет сильнее всего задаёт настроение","light sets the mood more than anything"),
+        style:H("bez stylu obraz sklouzne k průměrné „fotobance“","без стиля картинка уходит в усреднённый «сток»","without a style the image drifts to generic stock")
+      },
+      video:{
+        action:H("bez pohybu je video jen oživlá fotka","без движения в кадре видео превращается в ожившее фото","without motion the video is just a living photo"),
+        camera_move:H("jinak model zvolí pohyb kamery náhodně","иначе модель выберет движение камеры случайно","otherwise the model picks a camera move at random"),
+        lighting:H("světlo nejvíc určuje náladu","свет сильнее всего задаёт настроение","light sets the mood more than anything"),
+        style:H("bez stylu záběr sklouzne k průměrné „fotobance“","без стиля кадр уходит в усреднённый «сток»","without a style the shot drifts to generic stock")
+      },
+      text:{
+        context:H("bez kontextu bude odpověď „průměrem internetu“","без контекста ответ будет «в среднем по интернету»","without context the answer is “the internet average”"),
+        format:H("jinak si formát odpovědi zvolí model","иначе формат ответа выберет модель","otherwise the model chooses the answer format"),
+        role:H("role určuje úroveň a slovník odpovědi","роль задаёт уровень и лексику ответа","the role sets the level and vocabulary of the answer")
+      },
+      code:{
+        testing:H("podle čeho model pozná, že je hotovo","как модель поймёт, что задача решена","how the model knows the task is done"),
+        response:H("jinak dostaneš dlouhé vysvětlování","иначе получишь простыню объяснений","otherwise you get a wall of explanation"),
+        constraints:H("čeho se nedotýkat a jaké závislosti nepřidávat","что нельзя трогать и какие зависимости запрещены","what not to touch and which dependencies are off-limits")
+      }
+    }
+  };
+  function tr(o,map){ return fill(o[lang],map||{}); }
+
+  /* ---------- правила ---------- */
+  function analyze(){
+    var s=st(), hints=[], f=fmts[mode];
+    var val=function(id){ return (s[id]||"").trim(); };
+    var has=function(id){ return val(id).length>0; };
+    function add(h){ hints.push(h); }
+    var desc=DESC[mode].filter(has);
+    var descText=desc.map(val).join("\n");
+    var any=MODES[mode].fields.some(function(fl){ return has(fl.id); });
+    if(!any) return hints;
+
+    /* 1. секреты и шаблонные заглушки — во всех режимах */
+    MODES[mode].fields.forEach(function(fl){
+      var v=val(fl.id); if(!v) return;
+      var sec=firstMatch(RX_SECRET,v);
+      if(sec){ var nm=sec.match(/^([\w-]+)\s*[:=]/); var shown=nm?nm[1]:sec.slice(0,4)+"…";
+        add({id:"secret:"+fl.id,sev:"risk",field:fl.id,text:tr(M.secret,{x:qt(shown)})}); }
+      if(!fl.code){ var ph=firstMatch(RX_PLACEHOLDER,v);
+        if(ph) add({id:"ph:"+fl.id,sev:"warn",field:fl.id,text:tr(M.placeholder,{x:qt(ph)})}); }
+    });
+
+    /* 2. размытые оценки */
+    desc.forEach(function(id){
+      if(mode==="text"&&id==="examples") return;
+      var w=findAll(RX_VAGUE,val(id));
+      if(w.length) add({id:"vague:"+id+":"+w.map(lc).join("|"),sev:"warn",field:id,
+        text:tr(mode==="image"||mode==="video"?M.vague:M.vagueT,{x:qlist(w)}),
+        acts:[{t:"remove",f:id,words:w,label:tr(M.aRemove)+" "+qlist(w)}]});
+    });
+
+    /* 3. короткий / перегруженный ключевой блок */
+    COVER[mode].crit.forEach(function(id){
+      if(!has(id)||focusedField===id) return;
+      var n=wordsN(val(id)), min=(mode==="image"||mode==="video")?3:4;
+      if(id==="stack") return;
+      if(n<min) add({id:"short:"+id,sev:"warn",field:id,text:tr(mode==="image"||mode==="video"?M.shortSubj:M.shortTask)});
+    });
+    if(mode==="image"||mode==="video"){
+      MODES[mode].fields.forEach(function(fl){
+        if(fl.size!=="sm"||!has(fl.id)) return;
+        var n=wordsN(val(fl.id));
+        if(n>45) add({id:"long:"+fl.id,sev:"tip",field:fl.id,text:tr(M.longBlock,{n:n})});
+      });
+    }
+
+    /* 4. дубли между блоками */
+    var seen={};
+    MODES[mode].fields.forEach(function(fl){
+      var v=val(fl.id); if(wordsN(v)<3) return;
+      var k=lc(v).replace(/\s+/g," ").replace(/[.,;!]+$/,"");
+      if(seen[k]) add({id:"dup:"+fl.id,sev:"tip",field:fl.id,text:tr(M.dup,{a:fieldLabel(seen[k]),b:fieldLabel(fl.id)}),
+        acts:[{t:"clear",f:fl.id,label:tr(M.aClear)}]});
+      else seen[k]=fl.id;
+    });
+
+    if(mode==="image"||mode==="video") visualRules();
+    if(mode==="text") textRules();
+    if(mode==="code") codeRules();
+
+    /* 5. незаполненные важные блоки */
+    var critOk=COVER[mode].crit.every(has);
+    if(critOk){
+      COVER[mode].rec.forEach(function(id){
+        if(has(id)) return;
+        var why=M.why[mode]&&M.why[mode][id]; if(!why) return;
+        var fd=fieldDef(id), acts=[];
+        if(fd&&fd.chips) fd.chips.slice(0,3).forEach(function(term){ acts.push({t:"chip",f:id,v:term,label:"+ "+term}); });
+        add({id:"miss:"+id,sev:"miss",field:id,text:tr(M.miss,{f:fieldLabel(id),why:why[lang]}),inline:tr(M.missInline,{why:why[lang]}),acts:acts});
+      });
+    }
+    return hints;
+
+    /* ---- изображение и видео ---- */
+    function visualRules(){
+      var isImg=mode==="image";
+      // «волшебные слова» — уместны только в тегах для SDXL
+      if(!(isImg&&f==="tags")) desc.forEach(function(id){
+        var w=findAll(RX_BOOST,val(id));
+        if(w.length) add({id:"boost:"+id+":"+w.map(lc).join("|"),sev:"warn",field:id,text:tr(M.boost,{x:qlist(w)}),
+          acts:[{t:"remove",f:id,words:w,label:tr(M.aRemove)+" "+qlist(w)}]});
+      });
+      // отрицания в позитивной части
+      desc.forEach(function(id){
+        var re=rxNegPhrase(), m, pairs=[];
+        while((m=re.exec(val(id)))){ pairs.push({full:(m[1]+" "+m[2]).trim(),item:m[2].trim()}); }
+        if(!pairs.length) return;
+        var x=qlist(pairs.map(function(p){ return p.full; }));
+        if(isImg) add({id:"negpos:"+id+":"+lc(x),sev:"warn",field:id,text:tr(M.negPos,{x:x}),
+          acts:[{t:"toNeg",f:id,pairs:pairs,label:tr(M.aNeg)}]});
+        else add({id:"negpos:"+id+":"+lc(x),sev:"warn",field:id,text:tr(M.negPosV,{x:x})});
+      });
+      // отрицания внутри негатива
+      if(isImg&&has("negative")&&rxNegWord().test(val("negative")))
+        add({id:"negfield",sev:"tip",field:"negative",text:tr(M.negField),acts:[{t:"strip",f:"negative",label:tr(M.aStrip)}]});
+      // противоречия
+      var ctext=desc.filter(function(id){ return id!=="arc"; }).map(val).join("\n");
+      CONFLICTS.forEach(function(c){
+        if(c.modes&&c.modes.indexOf(mode)<0) return;
+        var a=firstMatch(C[c.a],ctext), b=firstMatch(C[c.b],ctext);
+        if(!a||!b||lc(a)===lc(b)) return;
+        if(c.k==="size"&&!isImg&&C.moveCam.test(ctext)) return; // в видео это может быть переход
+        add({id:"conf:"+c.k,sev:"conflict",field:null,text:tr(M.conflict,{a:qt(a),b:qt(b),why:M.k[c.k][lang]})});
+      });
+      // кадр против сюжета
+      var ar=aspects[mode];
+      if(ar&&ar!=="—"){
+        var vx=firstMatch(C.vertical,ctext), hx=firstMatch(C.horizontal,ctext);
+        if(vx&&!hx&&["16:9","21:9","3:2"].indexOf(ar)>=0){ var to=isImg?"2:3":"9:16";
+          add({id:"aspV:"+ar,sev:"tip",field:null,text:tr(M.aspectV,{x:qt(vx),ar:ar,to:to}),acts:[{t:"aspect",v:to,label:tr(M.aAspect,{v:to})}]}); }
+        if(hx&&!vx&&["9:16","2:3","4:5"].indexOf(ar)>=0){
+          add({id:"aspH:"+ar,sev:"tip",field:null,text:tr(M.aspectH,{x:qt(hx),ar:ar,to:"16:9"}),acts:[{t:"aspect",v:"16:9",label:tr(M.aAspect,{v:"16:9"})}]}); }
+      }
+      // оптика в иллюстрации
+      var lx=firstMatch(C.lens,ctext), ix=firstMatch(C.illus,ctext);
+      if(lx&&ix&&!C.photo.test(ctext)) add({id:"lensIllus",sev:"tip",field:isImg?"camera":null,text:tr(M.lensIllus,{x:qt(lx),y:qt(ix)})});
+      // текст в кадре
+      if(isImg){ var tq=firstMatch(/[«"“„][^«»"“”„]{1,40}[»"”“]/,["subject","action","environment","style"].map(val).join(" "));
+        if(tq) add({id:"textimg",sev:"tip",field:"subject",text:tr(M.textInImage,{x:tq})}); }
+      // флаги Midjourney
+      var params=val("params"), flag=firstMatch(/--[a-z]+/i,params);
+      if(flag&&!(isImg&&f==="midjourney")){
+        var acts=isImg?[{t:"fmt",v:"midjourney",label:tr(M.aFmt,{v:"Midjourney"})}]:[];
+        add({id:"mjflags",sev:"warn",field:"params",text:tr(M.mjFlags,{x:qt(flag),f:T().fmtNames[f]||f}),acts:acts});
+      }
+      if(/--ar\s/i.test(params)&&ar&&ar!=="—")
+        add({id:"ardup",sev:"warn",field:"params",text:tr(M.arDup,{ar:ar}),acts:[{t:"aspect",v:"—",label:tr(M.aAspectOff)}]});
+      if(isImg&&f==="midjourney"&&/--no\s/i.test(params)&&has("negative"))
+        add({id:"nodup",sev:"warn",field:"params",text:tr(M.noDup)});
+      // теги — короткие фразы
+      if(isImg&&f==="tags") desc.forEach(function(id){
+        if(val(id).split(",").some(function(p){ return wordsN(p)>6; }))
+          add({id:"tagslong:"+id,sev:"tip",field:id,text:tr(M.tagsLong)});
+      });
+      // длина прозы
+      if(f==="prose"){ var n=wordsN(compose()), lim=isImg?120:150;
+        if(n>lim) add({id:"proselong",sev:"tip",field:null,text:tr(M.proseLong,{n:n})}); }
+      // язык текста
+      var cl=contentLang();
+      if(cl!=="en"){
+        var ln=M.langName[cl][lang];
+        if(isImg&&(f==="midjourney"||f==="tags")) add({id:"langwarn",sev:"warn",field:null,text:tr(M.langWarn,{l:ln})});
+        else add({id:"langtip:"+cl,sev:"tip",field:null,text:tr(M.langTip,{l:ln})});
+      }
+      if(!isImg){
+        // несколько действий подряд
+        var seq=(val("action")+" "+val("arc")).match(/(?:^|[^\p{L}])(затем|потом|после этого|then|after that|afterwards|pak|potom|poté|následně)(?![\p{L}])|→|->/giu);
+        if(seq&&seq.length>=2) add({id:"vmulti",sev:"warn",field:has("arc")?"arc":"action",text:tr(M.videoMulti,{n:seq.length+1})});
+        // длительность
+        var dre=/(\d+(?:[.,]\d+)?)\s*(?:s|sec|secs|seconds?|с|сек\p{L}*|sekund\p{L}*|vteřin\p{L}*)(?![\p{L}])/giu, dm, dmax=null;
+        var dtext=val("dynamics")+" "+params;
+        while((dm=dre.exec(dtext))){ var v=parseFloat(dm[1].replace(",",".")); if(v>10&&(!dmax||v>dmax.v)) dmax={v:v,t:dm[0].trim()}; }
+        if(dmax) add({id:"vlong",sev:"tip",field:has("dynamics")?"dynamics":"params",text:tr(M.videoLong,{x:qt(dmax.t)})});
+        // слишком много движений камеры
+        var cms=findAll(new RegExp(WB+"("+C.moveCam.source+")"+WE,"giu"),val("camera_move"));
+        if(cms.length>2) add({id:"cammany",sev:"warn",field:"camera_move",text:tr(M.camMany,{n:cms.length,x:qlist(cms)})});
+      }
+    }
+
+    /* ---- текст ---- */
+    function textRules(){
+      if(has("role")&&wordsN(val("role"))<=5&&/(эксперт|expert|помощник|assistant|asistent|специалист|specialist|odborník|профессионал|professional|\bAI\b|ИИ)/iu.test(val("role")))
+        add({id:"rolegen",sev:"tip",field:"role",text:tr(M.roleGeneric)});
+      commonInstructionRules(["task","context","format","constraints","notes"]);
+      if(has("examples")&&val("examples").split(/\n/).filter(function(l){ return l.trim(); }).length<2)
+        add({id:"oneex",sev:"tip",field:"examples",text:tr(M.oneExample)});
+      var lenField=["task","format","constraints"].find(function(id){ return findAll(RX_LEN,val(id)).length; });
+      if(lenField&&!/\d/.test(val("format")+val("constraints")+val("task"))){
+        add({id:"lenvague",sev:"tip",field:lenField,text:tr(M.lenVague,{x:qlist(findAll(RX_LEN,val(lenField)))})});
+      }
+    }
+
+    /* ---- код ---- */
+    function codeRules(){
+      var task=val("task");
+      if(has("stack")&&!/\d/.test(val("stack"))) add({id:"versions",sev:"tip",field:"stack",text:tr(M.versions,{x:qt(val("stack").split(/[,+]/)[0].trim())})});
+      var allText=MODES.code.fields.map(function(fl){ return val(fl.id); }).join("\n");
+      if(/(ошибк|баг|не работает|падает|вылетает|\bbug|\berror|broken|crash|\bfails?\b|exception|chyb|nefunguj|padá)/iu.test(task)
+        &&!/(error|exception|traceback|ошибка:|chyba:|\w+Error\b|line \d+|:\d+:\d+)/i.test(allText.replace(task,"")))
+        add({id:"bugnoerr",sev:"warn",field:"task",text:tr(M.bugNoErr)});
+      if(!has("existing_code")&&/(рефактор|отрефактор|доработ|исправ|почин|перепиш|refactor|\bfix|improve|modify|rewrite|uprav|oprav|vylepš|přepiš)/iu.test(task))
+        add({id:"fixnocode",sev:"warn",field:"existing_code",text:tr(M.fixNoCode,{f:fieldLabel("existing_code")}),acts:[{t:"focus",f:"existing_code",label:tr(M.aGo)}]});
+      var broad=findAll(rx(["сайт\\p{L}*","приложени\\p{L}*","app","website","web","aplikac\\p{L}*","бот\\p{L}*","bot","игр(?:а|у|ы|е|ой)","game","hr(?:a|u|y)"]),task)[0];
+      if(broad&&wordsN(task)<=6) add({id:"broad",sev:"warn",field:"task",text:tr(M.tooBroad,{x:qt(task)})});
+      var qv=findAll(rx(["best practices","лучш\\p{L}* практик\\p{L}*","clean code","чист\\p{L}* код\\p{L}*","оптимизир\\p{L}*","оптимизац\\p{L}*","optimi[sz]e","optimi[sz]ation","optimaliz\\p{L}*","production[- ]ready","enterprise"]),task+" "+val("constraints"));
+      if(qv.length&&!/\d/.test(task+val("constraints")+val("testing")))
+        add({id:"qvague",sev:"tip",field:"task",text:tr(M.qualityVague,{x:qlist(qv)})});
+      var lines=val("existing_code").split("\n").length;
+      if(has("existing_code")&&lines>300) add({id:"longcode",sev:"tip",field:"existing_code",text:tr(M.longCode,{n:lines})});
+      commonInstructionRules(["task","constraints","contract"]);
+    }
+
+    function commonInstructionRules(ids){
+      // капс и «ОБЯЗАТЕЛЬНО»
+      ids.forEach(function(id){
+        var v=val(id); if(!v) return;
+        var caps=findAll(rx(["IMPORTANT","MUST","NEVER","ALWAYS","CRITICAL","ONLY","DO NOT","ОБЯЗАТЕЛЬНО","ВАЖНО","НИКОГДА","ВСЕГДА","ТОЛЬКО","НЕЛЬЗЯ","DŮLEŽITÉ","NIKDY","VŽDY","POUZE","NESMÍ","MUSÍ"]),v)
+          .filter(function(w){ return w===w.toUpperCase(); });
+        if(caps.length||/!{3,}/.test(v)) add({id:"shout:"+id,sev:"tip",field:id,text:tr(M.shout,{x:caps.length?qlist(caps):qt("!!!")})});
+      });
+      // одни запреты в ограничениях
+      var cons=val("constraints");
+      if(cons){
+        var negs=cons.match(/(?:^|[^\p{L}])(не|нельзя|никогда|без|no|not|don'?t|never|avoid|ne|nikdy|nesmí|bez)(?![\p{L}])/giu)||[];
+        var sentences=cons.split(/[.!?\n;]+/).filter(function(x){ return x.trim(); }).length;
+        if(negs.length>=2&&negs.length>=sentences) add({id:"negonly",sev:"tip",field:"constraints",text:tr(M.negOnly)});
+        if(sentences>=2&&wordsN(cons)>=8&&!/(потому что|так как|чтобы|because|so that|since|protože|aby|jelikož)/iu.test(cons))
+          add({id:"nowhy",sev:"tip",field:"constraints",text:tr(M.noWhy)});
+      }
+    }
+  }
+  var RX_LEN=rx(["кратко","коротко","покороче","подробно","подробнее","развёрнуто","развернуто","briefly","concise(?:ly)?","short(?:er)?","detailed","in detail","stručně","krátce","podrobně","kratší"]);
+
+  /* ---------- сила промпта ---------- */
+  function strength(hints){
+    var cov=COVER[mode], s=st();
+    var filled=function(id){ return (s[id]||"").trim().length>0; };
+    var part=function(arr){ return arr.length?arr.filter(filled).length/arr.length:1; };
+    if(!MODES[mode].fields.some(function(fl){ return filled(fl.id); })) return null;
+    var score=40*part(cov.crit)+40*part(cov.rec)+20*part(cov.nice), pen=0;
+    hints.forEach(function(h){ if(h.sev==="risk"||h.sev==="conflict") pen+=12; else if(h.sev==="warn") pen+=7; });
+    score-=Math.min(pen,45);
+    if(part(cov.crit)<1) score=Math.min(score,39);
+    return score>=85?3:score>=65?2:score>=40?1:0;
+  }
+
+  /* ---------- действия ---------- */
+  function focusField(id){
+    var fe=fieldEls.find(function(x){ return x.id===id; }); if(!fe) return;
+    fe.block.scrollIntoView({block:"center",behavior:"smooth"}); fe.ta.focus({preventScroll:true});
+  }
+  function addChip(id,term){
+    var cur=st()[id]||"";
+    if(lc(cur).indexOf(lc(term))!==-1) return;
+    setField(id,cur.trim()?cur.trim().replace(/,\s*$/,"")+", "+term:term);
+  }
+  function runAct(a){
+    var v;
+    if(a.t==="focus") return focusField(a.f);
+    if(a.t==="chip") return addChip(a.f,a.v);
+    if(a.t==="clear") return setField(a.f,"");
+    if(a.t==="remove"){
+      v=st()[a.f];
+      a.words.forEach(function(w){ v=v.replace(new RegExp("("+WB+")"+esc(w)+WE,"giu"),"$1"); });
+      return setField(a.f,cleanList(v));
+    }
+    if(a.t==="toNeg"){
+      v=st()[a.f];
+      a.pairs.forEach(function(p){ v=v.replace(p.full,""); });
+      setField(a.f,cleanList(v));
+      var neg=(st().negative||"").trim(), items=a.pairs.map(function(p){ return p.item; });
+      return setField("negative",dedupList([neg].concat(items).filter(Boolean)));
+    }
+    if(a.t==="strip"){
+      v=st()[a.f].replace(rxNegWord(),function(m,w){ return m.slice(0,m.length-w.length); }).replace(/\s{2,}/g," ");
+      return setField(a.f,cleanList(v));
+    }
+    if(a.t==="aspect"){ aspects[mode]=a.v; buildAspectBar(); render(); persistDraft(); return; }
+    if(a.t==="fmt"){ setFmt(a.v); return; }
+  }
+
+  /* ---------- отрисовка ---------- */
+  function hintEl(h,withField){
+    var li=document.createElement("li"); li.className="hint sev-"+h.sev;
+    var body='<span class="h-dot" aria-hidden="true"></span><div class="h-body"><div class="h-text"></div><div class="h-acts"></div></div>'+
+      '<button type="button" class="h-x" aria-label="'+M.dismiss[lang]+'" title="'+M.dismiss[lang]+'">×</button>';
+    li.innerHTML=body;
+    var txt=li.querySelector(".h-text");
+    if(withField&&h.field){
+      var fb=document.createElement("button"); fb.type="button"; fb.className="h-field"; fb.textContent=fieldLabel(h.field);
+      fb.addEventListener("click",function(){ focusField(h.field); });
+      txt.appendChild(fb); txt.appendChild(document.createTextNode(" · "));
+    }
+    txt.appendChild(document.createTextNode(h.text));
+    var acts=li.querySelector(".h-acts");
+    (h.acts||[]).forEach(function(a){
+      var b=document.createElement("button"); b.type="button"; b.textContent=a.label;
+      b.addEventListener("click",function(){ runAct(a); });
+      acts.appendChild(b);
+    });
+    if(!acts.children.length) acts.remove();
+    li.querySelector(".h-x").addEventListener("click",function(){
+      dismissed[mode][h.id]=1; persistDraft(); renderHints();
+    });
+    return li;
+  }
+
+  function scheduleHints(){ clearTimeout(hintTimer); hintTimer=setTimeout(renderHints,280); }
+
+  function renderHints(){
+    clearTimeout(hintTimer);
+    var panel=document.getElementById("quality");
+    var all=analyze();
+    var hints=all.filter(function(h){ return !dismissed[mode][h.id]; })
+      .sort(function(a,b){ return SEV_ORDER[a.sev]-SEV_ORDER[b.sev]; });
+    var level=strength(all);
+
+    // подсказки под блоками
+    fieldEls.forEach(function(fe){
+      var mine=hints.filter(function(h){ return h.field===fe.id; });
+      fe.bh.innerHTML="";
+      var shown=0;
+      mine.forEach(function(h){
+        if(shown>=2) return;
+        fe.bh.appendChild(hintEl(h.sev==="miss"?{id:h.id,sev:"miss",text:h.inline,acts:h.acts}:h,false));
+        shown++;
+      });
+      fe.bh.hidden=!shown;
+    });
+
+    // панель
+    if(level===null){ panel.hidden=true; return; }
+    panel.hidden=false; panel.dataset.level=level;
+    document.getElementById("qTitle").textContent=M.title[lang];
+    document.getElementById("qLevel").textContent=M.levels[lang][level];
+    var list=document.getElementById("qList"), more=document.getElementById("qMore"), ok=document.getElementById("qOk");
+    list.innerHTML="";
+    var LIMIT=3, vis=hintsOpen?hints:hints.slice(0,LIMIT);
+    vis.forEach(function(h){ list.appendChild(hintEl(h,true)); });
+    list.hidden=!hints.length;
+    ok.hidden=!!hints.length; ok.textContent=M.ok[lang];
+    if(hints.length>LIMIT){
+      more.hidden=false;
+      more.textContent=hintsOpen?M.less[lang]:fill(M.more[lang],{n:hints.length});
+    } else more.hidden=true;
+  }
+  document.getElementById("qMore").addEventListener("click",function(){ hintsOpen=!hintsOpen; renderHints(); });
 
   var form=document.getElementById("form");
   var out=document.getElementById("out"), countEl=document.getElementById("count");
@@ -909,13 +1600,16 @@
         '<label for="fld-'+f.id+'"></label>'+
         '<button type="button" class="clr" aria-label="'+CLR_LABEL[lang]+'" title="'+CLR_LABEL[lang]+'">×</button>'+
         '</div><p class="hint"></p>'+
-        '<textarea id="fld-'+f.id+'" class="'+f.size+(f.code?" codearea":"")+'"></textarea>';
+        '<textarea id="fld-'+f.id+'" class="'+f.size+(f.code?" codearea":"")+'"></textarea>'+
+        '<div class="bh" hidden></div>';
       form.appendChild(block);
       var ta=block.querySelector("textarea");
       var lab=block.querySelector("label"); lab.textContent=f.label[lang]; lab.setAttribute("for","fld-"+f.id);
       block.querySelector(".hint").textContent=f.hint[lang];
       ta.placeholder=f.ph[lang]; ta.value=st()[f.id];
       block.classList.toggle("filled",st()[f.id].trim().length>0);
+      ta.addEventListener("focus",function(){ focusedField=f.id; });
+      ta.addEventListener("blur",function(){ focusedField=null; renderHints(); });
       ta.addEventListener("input",function(){
         st()[f.id]=ta.value; block.classList.toggle("filled",ta.value.trim().length>0);
         render(); persistDraft();
@@ -928,9 +1622,7 @@
           if(GLOSS[term]) b.classList.add("hasinfo");
           b.addEventListener("click",function(){
             hideTip();
-            var cur=st()[f.id]||"";
-            if(cur.toLowerCase().indexOf(term.toLowerCase())!==-1) return;
-            setField(f.id,cur.trim()?cur.trim().replace(/,\s*$/,"")+", "+term:term);
+            addChip(f.id,term);
           });
           b.addEventListener("mouseenter",function(){ showTip(b,term); });
           b.addEventListener("mouseleave",hideTip);
@@ -940,7 +1632,7 @@
         });
         block.appendChild(wrap);
       }
-      fieldEls.push({id:f.id,block:block,ta:ta});
+      fieldEls.push({id:f.id,block:block,ta:ta,bh:block.querySelector(".bh")});
     });
   }
 
@@ -974,7 +1666,8 @@
     fmtNote.textContent=T().fmtNoteFn(T().fmtNames[fmts[mode]]);
   }
 
-  function render(){
+  function render(){ renderOut(); scheduleHints(); }
+  function renderOut(){
     var text=compose();
     var filledN=MODES[mode].fields.filter(function(f){ return st()[f.id].trim(); }).length;
     fillN.textContent=filledN;
@@ -1052,6 +1745,7 @@
     if(clearAllBtn.disabled) return;
     armConfirm(clearAllBtn,T().clearSure,function(){
       MODES[mode].fields.forEach(function(f){ st()[f.id]=""; });
+      dismissed[mode]={};
       buildForm(); render(); persistDraft();
     });
   });
@@ -1116,8 +1810,19 @@
     armConfirm(this,T().clearSure,function(){ history=[]; persistHistory(); renderHistory(); });
   });
 
-  function openDrawer(){ document.body.classList.add("hist-open"); }
-  function closeDrawer(){ document.body.classList.remove("hist-open"); }
+  var drawerEl=document.getElementById("drawer"), histBtnEl=document.getElementById("histBtn");
+  drawerEl.inert=true; drawerEl.setAttribute("aria-hidden","true");
+  function openDrawer(){
+    document.body.classList.add("hist-open");
+    drawerEl.inert=false; drawerEl.removeAttribute("aria-hidden");
+    document.getElementById("histClose").focus();
+  }
+  function closeDrawer(){
+    if(!document.body.classList.contains("hist-open")) return;
+    document.body.classList.remove("hist-open");
+    drawerEl.inert=true; drawerEl.setAttribute("aria-hidden","true");
+    histBtnEl.focus();
+  }
   document.getElementById("histBtn").addEventListener("click",openDrawer);
   document.getElementById("histClose").addEventListener("click",closeDrawer);
   document.getElementById("overlay").addEventListener("click",closeDrawer);
